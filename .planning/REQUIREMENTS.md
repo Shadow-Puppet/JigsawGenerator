@@ -83,27 +83,27 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| GRID-01 | — | Pending |
-| GRID-02 | — | Pending |
-| GRID-03 | — | Pending |
-| GRID-04 | — | Pending |
-| GRID-05 | — | Pending |
-| GRID-06 | — | Pending |
-| CONN-01 | — | Pending |
-| CONN-02 | — | Pending |
-| CONN-03 | — | Pending |
-| EXPT-01 | — | Pending |
-| EXPT-02 | — | Pending |
-| GUI-01 | — | Pending |
-| GUI-02 | — | Pending |
-| GUI-03 | — | Pending |
-| INFR-01 | — | Pending |
-| INFR-02 | — | Pending |
+| INFR-01 | Phase 1 | Pending |
+| GRID-01 | Phase 2 | Pending |
+| GRID-02 | Phase 2 | Pending |
+| GRID-03 | Phase 2 | Pending |
+| GRID-04 | Phase 2 | Pending |
+| GRID-05 | Phase 2 | Pending |
+| GRID-06 | Phase 2 | Pending |
+| CONN-03 | Phase 2 | Pending |
+| INFR-02 | Phase 2 | Pending |
+| CONN-01 | Phase 3 | Pending |
+| CONN-02 | Phase 3 | Pending |
+| EXPT-01 | Phase 3 | Pending |
+| EXPT-02 | Phase 3 | Pending |
+| GUI-01 | Phase 4 | Pending |
+| GUI-02 | Phase 4 | Pending |
+| GUI-03 | Phase 4 | Pending |
 
 **Coverage:**
 - v1 requirements: 16 total
-- Mapped to phases: 0
-- Unmapped: 16 ⚠️
+- Mapped to phases: 16 ✓
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-01*
