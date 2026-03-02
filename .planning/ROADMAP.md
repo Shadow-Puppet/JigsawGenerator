@@ -22,7 +22,9 @@
   1. User can run a single build command that compiles Rust to WASM and bundles the web app
   2. A TypeScript function can call a Rust/WASM function and display the returned value in the browser
   3. WASM bundle size is under 500KB gzipped with optimized release profile
-**Plans**: TBD
+**Plans:** 1 plan
+Plans:
+- [ ] 01-01-PLAN.md — Rust workspace + WASM bindings + Vite web app + round-trip demo
 
 ### Phase 2: Grid Engine & Data Model
 **Goal**: The engine computes geometrically valid grid layouts with shared-edge architecture, deterministic seeding, and configurable dimensions — the complete data model foundation
@@ -62,7 +64,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Build Pipeline & WASM Foundation | 0/? | Not started | - |
+| 1. Build Pipeline & WASM Foundation | 0/1 | Planned | - |
 | 2. Grid Engine & Data Model | 0/? | Not started | - |
 | 3. Connector Generation & SVG Export | 0/? | Not started | - |
 | 4. Web GUI & Live Preview | 0/? | Not started | - |
@@ -93,4 +95,4 @@ Orphaned: 0
 
 ---
 *Roadmap created: 2026-03-01*
-*Last updated: 2026-03-01*
+*Last updated: 2026-03-02*
