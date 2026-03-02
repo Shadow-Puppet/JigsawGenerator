@@ -36,7 +36,11 @@ Plans:
   3. Changing tab size percentage or jitter amount produces visibly different edge parameters while maintaining geometric validity
   4. Engine reports accurate piece count breakdown (total, edge, corner, interior) for any grid configuration
   5. Connector generation uses a trait/interface that can be swapped without modifying grid or edge logic
-**Plans**: TBD
+**Plans:** 3 plans
+Plans:
+- [ ] 02-01-PLAN.md — Foundation types, config, seed, edge types, connector trait
+- [ ] 02-02-PLAN.md — Grid engine with shared-edge model (TDD)
+- [ ] 02-03-PLAN.md — WASM boundary integration + end-to-end verification
 
 ### Phase 3: Connector Generation & SVG Export
 **Goal**: The engine generates complete jigsaw puzzles with classic knob connectors and exports production-ready SVG files that work in laser cutter software
@@ -65,7 +69,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Build Pipeline & WASM Foundation | 1/1 | Complete | 2026-03-02 |
-| 2. Grid Engine & Data Model | 0/? | Not started | - |
+| 2. Grid Engine & Data Model | 0/3 | Not started | - |
 | 3. Connector Generation & SVG Export | 0/? | Not started | - |
 | 4. Web GUI & Live Preview | 0/? | Not started | - |
 
