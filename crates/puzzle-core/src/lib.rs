@@ -1,11 +1,15 @@
 pub mod config;
 pub mod connector;
 pub mod edge;
+pub mod grid;
+pub mod piece;
 pub mod seed;
 
 pub use config::*;
 pub use connector::*;
 pub use edge::*;
+pub use grid::*;
+pub use piece::*;
 pub use seed::*;
 
 use serde::{Deserialize, Serialize};
