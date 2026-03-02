@@ -1,3 +1,6 @@
+use kurbo::Point;
+use rand::RngExt;
+
 use crate::config::PuzzleConfig;
 use crate::edge::{Edge, TabDirection};
 use crate::piece::{Piece, PieceEdges, PieceType};
@@ -20,8 +23,77 @@ pub struct PuzzleGrid {
 
 impl PuzzleGrid {
     /// Construct a new PuzzleGrid from a validated PuzzleConfig.
-    pub fn new(_config: PuzzleConfig) -> Result<Self, String> {
-        todo!("GREEN phase: implement grid construction")
+    ///
+    /// RNG iteration order (CRITICAL for determinism):
+    /// 1. Iterate h_edges: row 0..=rows, col 0..cols
+    ///    - border rows (row == 0 || row == rows): direction = In
+    ///    - internal rows: direction = random from seeded RNG
+    /// 2. Then iterate v_edges: row 0..rows, col 0..=cols
+    ///    - border cols (col == 0 || col == cols): direction = In
+    ///    - internal cols: direction = random from seeded RNG
+    pub fn new(config: PuzzleConfig) -> Result<Self, String> {
+        config.validate()?;
+
+        let rows = config.rows as usize;
+        let cols = config.cols as usize;
+        let cell_w = config.width / cols as f64;
+        let cell_h = config.height / rows as f64;
+
+        let mut rng = create_rng(&config.seed);
+
+        // Build horizontal edges: (rows+1) rows, cols per row
+        let mut h_edges = Vec::with_capacity((rows + 1) * cols);
+        for row in 0..=rows {
+            for col in 0..cols {
+                let is_border = row == 0 || row == rows;
+                let direction = if is_border {
+                    TabDirection::In
+                } else {
+                    if rng.random_bool(0.5) {
+                        TabDirection::In
+                    } else {
+                        TabDirection::Out
+                    }
+                };
+                h_edges.push(Edge {
+                    start: Point::new(col as f64 * cell_w, row as f64 * cell_h),
+                    end: Point::new((col + 1) as f64 * cell_w, row as f64 * cell_h),
+                    is_border,
+                    direction,
+                    connector: None,
+                });
+            }
+        }
+
+        // Build vertical edges: rows rows, (cols+1) per row
+        let mut v_edges = Vec::with_capacity(rows * (cols + 1));
+        for row in 0..rows {
+            for col in 0..=cols {
+                let is_border = col == 0 || col == cols;
+                let direction = if is_border {
+                    TabDirection::In
+                } else {
+                    if rng.random_bool(0.5) {
+                        TabDirection::In
+                    } else {
+                        TabDirection::Out
+                    }
+                };
+                v_edges.push(Edge {
+                    start: Point::new(col as f64 * cell_w, row as f64 * cell_h),
+                    end: Point::new(col as f64 * cell_w, (row + 1) as f64 * cell_h),
+                    is_border,
+                    direction,
+                    connector: None,
+                });
+            }
+        }
+
+        Ok(PuzzleGrid {
+            config,
+            h_edges,
+            v_edges,
+        })
     }
 
     /// Get a reference to the horizontal edge at grid position (row, col).
