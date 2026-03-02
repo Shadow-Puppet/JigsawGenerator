@@ -69,7 +69,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Build Pipeline & WASM Foundation | 1/1 | Complete | 2026-03-02 |
-| 2. Grid Engine & Data Model | 0/3 | Not started | - |
+| 2. Grid Engine & Data Model | 0/3 | Planned | - |
 | 3. Connector Generation & SVG Export | 0/? | Not started | - |
 | 4. Web GUI & Live Preview | 0/? | Not started | - |
 
