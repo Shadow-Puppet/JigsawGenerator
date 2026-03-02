@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: "Completed 02-01-PLAN.md"
-last_updated: "2026-03-02T23:48:06Z"
+stopped_at: "Completed 02-02-PLAN.md"
+last_updated: "2026-03-02T23:54:57Z"
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 4
-  completed_plans: 2
+  completed_plans: 3
 ---
 
 # Project State: Puzzle Pattern Generator
@@ -18,17 +18,17 @@ progress:
 
 **Core Value:** Generate geometrically valid, laser-cuttable jigsaw puzzle SVG patterns with configurable dimensions and procedural variation so no two puzzles are identical.
 
-**Current Focus:** Phase 2 in progress. Foundation types complete, grid engine next.
+**Current Focus:** Phase 2 in progress. Foundation types and grid engine complete, WASM integration next.
 
 ## Current Position
 
 **Phase:** 02-grid-engine-data-model (in progress)
-**Plan:** 01 of 3 (complete)
+**Plan:** 02 of 3 (complete)
 **Status:** Executing Phase 2
 
 ```
 Phase 1 [x] Build Pipeline & WASM Foundation
-Phase 2 [~] Grid Engine & Data Model (1/3 plans)
+Phase 2 [~] Grid Engine & Data Model (2/3 plans)
 Phase 3 [ ] Connector Generation & SVG Export
 Phase 4 [ ] Web GUI & Live Preview
 ```
@@ -38,11 +38,12 @@ Phase 4 [ ] Web GUI & Live Preview
 | Metric | Value |
 |--------|-------|
 | Phases complete | 1/4 |
-| Plans complete | 2/4 |
-| Tasks complete | 4/4 |
-| Requirements met | 7/16 |
+| Plans complete | 3/4 |
+| Tasks complete | 7/7 |
+| Requirements met | 9/16 |
 | 01-01 duration | 6 min |
 | 02-01 duration | 4 min |
+| 02-02 duration | 3 min |
 
 ## Accumulated Context
 
@@ -58,6 +59,8 @@ Phase 4 [ ] Web GUI & Live Preview
 - FNV-1a hash for string-to-u64 seed conversion (portable, not std DefaultHasher)
 - rand with default-features=false to avoid getrandom panic on wasm32-unknown-unknown
 - RNG passed as &mut param to ConnectorGenerator (grid controls deterministic sequence)
+- Shared-edge model with index references: pieces reference edges by index into h_edges/v_edges, not by value
+- Fixed RNG consumption order: h_edges row-major then v_edges row-major for seed determinism
 
 ### Research Flags
 - **Phase 3 (Connectors):** Classic knob algorithm needs implementation validation. Constraint system for valid connectors has no reference implementation — needs experimentation.
@@ -76,9 +79,9 @@ Phase 4 [ ] Web GUI & Live Preview
 
 ## Session Continuity
 
-**Last session:** 2026-03-02T23:48:06Z
-**Stopped at:** Completed 02-01-PLAN.md
-**Next action:** Execute Plan 02 of Phase 2 (`/gsd-execute-phase 02-grid-engine-data-model`)
+**Last session:** 2026-03-02T23:54:57Z
+**Stopped at:** Completed 02-02-PLAN.md
+**Next action:** Execute Plan 03 of Phase 2 (`/gsd-execute-phase 02-grid-engine-data-model`)
 
 ---
-*Last updated: 2026-03-02T23:48:06Z*
+*Last updated: 2026-03-02T23:54:57Z*

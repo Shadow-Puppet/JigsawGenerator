@@ -9,12 +9,12 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Grid & Dimensions
 
-- [ ] **GRID-01**: User can configure puzzle grid as rows x columns
+- [x] **GRID-01**: User can configure puzzle grid as rows x columns
 - [x] **GRID-02**: User can set puzzle physical size in millimeters or inches
 - [x] **GRID-03**: User can control tab/knob size as percentage of edge length
 - [x] **GRID-04**: User can control jitter/randomness amount per edge
 - [x] **GRID-05**: User can set rounded corner radius on puzzle border
-- [ ] **GRID-06**: User can see piece count breakdown (total, edge, corner, interior)
+- [x] **GRID-06**: User can see piece count breakdown (total, edge, corner, interior)
 
 ### Connectors
 
@@ -84,12 +84,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | INFR-01 | Phase 1 | Complete |
-| GRID-01 | Phase 2 | Pending |
+| GRID-01 | Phase 2 | Complete |
 | GRID-02 | Phase 2 | Complete |
 | GRID-03 | Phase 2 | Complete |
 | GRID-04 | Phase 2 | Complete |
 | GRID-05 | Phase 2 | Complete |
-| GRID-06 | Phase 2 | Pending |
+| GRID-06 | Phase 2 | Complete |
 | CONN-03 | Phase 2 | Complete |
 | INFR-02 | Phase 2 | Complete |
 | CONN-01 | Phase 3 | Pending |
