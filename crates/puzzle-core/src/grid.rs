@@ -1,10 +1,22 @@
 use kurbo::Point;
 use rand::RngExt;
+use rand_chacha::ChaCha8Rng;
 
 use crate::config::PuzzleConfig;
 use crate::edge::{Edge, TabDirection};
 use crate::piece::{Piece, PieceEdges, PieceType};
 use crate::seed::create_rng;
+
+/// Assign tab direction: border edges always In, internal edges random.
+fn assign_direction(is_border: bool, rng: &mut ChaCha8Rng) -> TabDirection {
+    if is_border {
+        TabDirection::In
+    } else if rng.random_bool(0.5) {
+        TabDirection::In
+    } else {
+        TabDirection::Out
+    }
+}
 
 /// A puzzle grid with shared-edge data model.
 ///
@@ -41,49 +53,31 @@ impl PuzzleGrid {
 
         let mut rng = create_rng(&config.seed);
 
-        // Build horizontal edges: (rows+1) rows, cols per row
+        // Build horizontal edges: (rows+1) rows, cols columns
         let mut h_edges = Vec::with_capacity((rows + 1) * cols);
         for row in 0..=rows {
             for col in 0..cols {
                 let is_border = row == 0 || row == rows;
-                let direction = if is_border {
-                    TabDirection::In
-                } else {
-                    if rng.random_bool(0.5) {
-                        TabDirection::In
-                    } else {
-                        TabDirection::Out
-                    }
-                };
                 h_edges.push(Edge {
                     start: Point::new(col as f64 * cell_w, row as f64 * cell_h),
                     end: Point::new((col + 1) as f64 * cell_w, row as f64 * cell_h),
                     is_border,
-                    direction,
+                    direction: assign_direction(is_border, &mut rng),
                     connector: None,
                 });
             }
         }
 
-        // Build vertical edges: rows rows, (cols+1) per row
+        // Build vertical edges: rows rows, (cols+1) columns
         let mut v_edges = Vec::with_capacity(rows * (cols + 1));
         for row in 0..rows {
             for col in 0..=cols {
                 let is_border = col == 0 || col == cols;
-                let direction = if is_border {
-                    TabDirection::In
-                } else {
-                    if rng.random_bool(0.5) {
-                        TabDirection::In
-                    } else {
-                        TabDirection::Out
-                    }
-                };
                 v_edges.push(Edge {
                     start: Point::new(col as f64 * cell_w, row as f64 * cell_h),
                     end: Point::new(col as f64 * cell_w, (row + 1) as f64 * cell_h),
                     is_border,
-                    direction,
+                    direction: assign_direction(is_border, &mut rng),
                     connector: None,
                 });
             }
