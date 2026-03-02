@@ -1,3 +1,6 @@
+pub mod config;
+pub mod seed;
+
 use serde::{Deserialize, Serialize};
 
 /// Configuration for a puzzle grid.

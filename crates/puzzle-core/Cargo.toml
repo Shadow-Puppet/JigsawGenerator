@@ -5,3 +5,6 @@ edition = "2024"
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
+kurbo = { version = "0.13", features = ["serde"] }
+rand = { version = "0.10", default-features = false }
+rand_chacha = "0.10"
