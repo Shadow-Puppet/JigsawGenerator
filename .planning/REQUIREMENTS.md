@@ -35,7 +35,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Infrastructure
 
-- [ ] **INFR-01**: Puzzle generation runs in Rust compiled to WASM in the browser
+- [x] **INFR-01**: Puzzle generation runs in Rust compiled to WASM in the browser
 - [ ] **INFR-02**: Connector generation uses pluggable trait/interface (extensible for future types)
 
 ## v2 Requirements
@@ -83,7 +83,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INFR-01 | Phase 1 | Pending |
+| INFR-01 | Phase 1 | Complete |
 | GRID-01 | Phase 2 | Pending |
 | GRID-02 | Phase 2 | Pending |
 | GRID-03 | Phase 2 | Pending |

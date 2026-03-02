@@ -7,7 +7,7 @@
 
 ## Phases
 
-- [ ] **Phase 1: Build Pipeline & WASM Foundation** - Rust→WASM→browser build pipeline with round-trip proof
+- [x] **Phase 1: Build Pipeline & WASM Foundation** - Rust→WASM→browser build pipeline with round-trip proof
 - [ ] **Phase 2: Grid Engine & Data Model** - Grid layout, shared-edge architecture, seeded RNG, pluggable connector trait
 - [ ] **Phase 3: Connector Generation & SVG Export** - Classic knob connectors, procedural variation, laser-cutter-compatible SVG output
 - [ ] **Phase 4: Web GUI & Live Preview** - Parameter controls, live SVG preview, SVG download, URL sharing
@@ -24,7 +24,7 @@
   3. WASM bundle size is under 500KB gzipped with optimized release profile
 **Plans:** 1 plan
 Plans:
-- [ ] 01-01-PLAN.md — Rust workspace + WASM bindings + Vite web app + round-trip demo
+- [x] 01-01-PLAN.md — Rust workspace + WASM bindings + Vite web app + round-trip demo
 
 ### Phase 2: Grid Engine & Data Model
 **Goal**: The engine computes geometrically valid grid layouts with shared-edge architecture, deterministic seeding, and configurable dimensions — the complete data model foundation
@@ -64,7 +64,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Build Pipeline & WASM Foundation | 0/1 | Planned | - |
+| 1. Build Pipeline & WASM Foundation | 1/1 | Complete | 2026-03-02 |
 | 2. Grid Engine & Data Model | 0/? | Not started | - |
 | 3. Connector Generation & SVG Export | 0/? | Not started | - |
 | 4. Web GUI & Live Preview | 0/? | Not started | - |
