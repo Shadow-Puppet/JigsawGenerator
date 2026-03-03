@@ -51,7 +51,10 @@ Plans:
   2. Exported SVG opens correctly in LightBurn or equivalent laser cutter software with no parse errors, using absolute coordinates, inline stroke attributes, and explicit physical units
   3. User can apply kerf compensation and the resulting SVG paths are offset inward/outward by the specified amount, producing snug-fitting pieces when laser cut
   4. Generated SVG contains no overlapping paths, no gaps between adjacent pieces, and border pieces have rounded corners matching the configured radius
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 03-01-PLAN.md — ClassicKnobConnector implementation with TDD (knob shape, jitter, grid wiring)
+- [ ] 03-02-PLAN.md — SVG export pipeline with kerf compensation and WASM endpoint
 
 ### Phase 4: Web GUI & Live Preview
 **Goal**: Users can configure, preview, and export puzzles entirely in the browser through an intuitive web interface
@@ -70,7 +73,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 1. Build Pipeline & WASM Foundation | 1/1 | Complete | 2026-03-02 |
 | 2. Grid Engine & Data Model | 3/3 | Complete | 2026-03-03 |
-| 3. Connector Generation & SVG Export | 0/? | Not started | - |
+| 3. Connector Generation & SVG Export | 0/2 | Planned | - |
 | 4. Web GUI & Live Preview | 0/? | Not started | - |
 
 ## Coverage Map
