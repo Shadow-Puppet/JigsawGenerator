@@ -133,6 +133,11 @@ pub struct PuzzleConfig {
     pub border: BorderConfig,
     /// User seed string (empty = auto-generate).
     pub seed: String,
+    /// Kerf compensation width in mm (0.0..=1.0, default 0.0).
+    /// When > 0, all SVG paths are offset outward by half this value
+    /// to compensate for material removed by the laser beam.
+    #[serde(default)]
+    pub kerf_width: f64,
 }
 
 impl Default for PuzzleConfig {
@@ -147,6 +152,7 @@ impl Default for PuzzleConfig {
             jitter: JitterConfig::default(),
             border: BorderConfig::default(),
             seed: String::new(),
+            kerf_width: 0.0,
         }
     }
 }
@@ -168,6 +174,12 @@ impl PuzzleConfig {
         if self.height <= 0.0 {
             return Err(format!("height must be positive, got {}", self.height));
         }
+        if self.kerf_width < 0.0 || self.kerf_width > 1.0 {
+            return Err(format!(
+                "kerf_width must be between 0.0 and 1.0, got {}",
+                self.kerf_width
+            ));
+        }
         self.tab.validate()?;
         self.jitter.validate()?;
         self.border.validate()?;
@@ -188,6 +200,7 @@ impl PuzzleConfig {
         jitter: JitterConfig,
         border: BorderConfig,
         seed: String,
+        kerf_width: f64,
     ) -> Result<Self, String> {
         let config = Self {
             rows,
@@ -199,6 +212,7 @@ impl PuzzleConfig {
             jitter,
             border,
             seed,
+            kerf_width,
         };
         config.validate()?;
         Ok(config)
@@ -336,6 +350,7 @@ mod tests {
             JitterConfig::default(),
             BorderConfig::default(),
             "test".to_string(),
+            0.0,
         )
         .unwrap();
 
@@ -355,6 +370,7 @@ mod tests {
             JitterConfig::default(),
             BorderConfig::default(),
             String::new(),
+            0.0,
         )
         .unwrap();
 
@@ -374,6 +390,7 @@ mod tests {
             JitterConfig::default(),
             BorderConfig::default(),
             String::new(),
+            0.0,
         );
         assert!(result.is_err());
     }
@@ -391,6 +408,7 @@ mod tests {
             JitterConfig { amount: 0.0 },
             BorderConfig { corner_radius: 0.0 },
             String::new(),
+            0.0,
         );
         assert!(config.is_ok());
 
@@ -407,7 +425,28 @@ mod tests {
                 corner_radius: 10.0,
             },
             String::new(),
+            1.0,
         );
         assert!(config.is_ok());
+    }
+
+    #[test]
+    fn test_validate_kerf_negative() {
+        let mut config = PuzzleConfig::default();
+        config.kerf_width = -0.1;
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn test_validate_kerf_too_large() {
+        let mut config = PuzzleConfig::default();
+        config.kerf_width = 1.1;
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn test_default_kerf_zero() {
+        let config = PuzzleConfig::default();
+        assert!((config.kerf_width - 0.0).abs() < 1e-10);
     }
 }

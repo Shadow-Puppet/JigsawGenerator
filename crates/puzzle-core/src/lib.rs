@@ -3,16 +3,20 @@ pub mod config;
 pub mod connector;
 pub mod edge;
 pub mod grid;
+pub mod kerf;
 pub mod piece;
 pub mod seed;
+pub mod svg_export;
 
 pub use classic_connector::*;
 pub use config::*;
 pub use connector::*;
 pub use edge::*;
 pub use grid::*;
+pub use kerf::*;
 pub use piece::*;
 pub use seed::*;
+pub use svg_export::*;
 
 use serde::{Deserialize, Serialize};
 
