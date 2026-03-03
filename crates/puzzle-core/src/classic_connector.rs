@@ -23,6 +23,21 @@ const CP_JITTER_RANGE: f64 = 0.03;
 /// How far beyond the knob top the control points overshoot (creates rounded top).
 const TOP_OVERSHOOT: f64 = 1.05;
 
+/// Width of the knob body as a fraction of knob_w (where the body meets the top curve).
+const BODY_WIDTH_RATIO: f64 = 0.3;
+
+/// How much of the knob height the body transition covers.
+const BODY_SHOULDER_RATIO: f64 = 0.85;
+
+/// How much of the knob height the neck-to-body transition covers.
+const NECK_BODY_RATIO: f64 = 0.6;
+
+/// How far the first control point extends beyond the knob entry (approach angle).
+const APPROACH_RATIO: f64 = 1.2;
+
+/// Width of the knob top curve control points (how wide the rounded top is).
+const TOP_WIDTH_RATIO: f64 = 0.1;
+
 /// Classic jigsaw knob connector generator.
 ///
 /// Produces traditional Ravensburger-style knob shapes using cubic bezier curves
@@ -84,36 +99,42 @@ impl ConnectorGenerator for ClassicKnobConnector {
             // 1. Baseline → neck entry (left side)
             CubicBez::new(
                 Point::new(0.0, 0.0),
-                Point::new(center - knob_w * 1.2, 0.0),
+                Point::new(center - knob_w * APPROACH_RATIO, 0.0),
                 Point::new(center - neck_w, 0.0),
                 Point::new(center - neck_w, neck_h + cp_jitter[0]),
             ),
             // 2. Neck → knob body (left side, widening)
             CubicBez::new(
                 Point::new(center - neck_w, neck_h + cp_jitter[0]),
-                Point::new(center - neck_w, knob_h * 0.6 + cp_jitter[1]),
-                Point::new(center - knob_w, knob_h * 0.85),
-                Point::new(center - knob_w * 0.3, knob_h),
+                Point::new(center - neck_w, knob_h * NECK_BODY_RATIO + cp_jitter[1]),
+                Point::new(center - knob_w, knob_h * BODY_SHOULDER_RATIO),
+                Point::new(center - knob_w * BODY_WIDTH_RATIO, knob_h),
             ),
             // 3. Knob top (rounded)
             CubicBez::new(
-                Point::new(center - knob_w * 0.3, knob_h),
-                Point::new(center - knob_w * 0.1, knob_h * TOP_OVERSHOOT + cp_jitter[2]),
-                Point::new(center + knob_w * 0.1, knob_h * TOP_OVERSHOOT + cp_jitter[3]),
-                Point::new(center + knob_w * 0.3, knob_h),
+                Point::new(center - knob_w * BODY_WIDTH_RATIO, knob_h),
+                Point::new(
+                    center - knob_w * TOP_WIDTH_RATIO,
+                    knob_h * TOP_OVERSHOOT + cp_jitter[2],
+                ),
+                Point::new(
+                    center + knob_w * TOP_WIDTH_RATIO,
+                    knob_h * TOP_OVERSHOOT + cp_jitter[3],
+                ),
+                Point::new(center + knob_w * BODY_WIDTH_RATIO, knob_h),
             ),
             // 4. Knob body → neck (right side, narrowing)
             CubicBez::new(
-                Point::new(center + knob_w * 0.3, knob_h),
-                Point::new(center + knob_w, knob_h * 0.85),
-                Point::new(center + neck_w, knob_h * 0.6 + cp_jitter[1]),
+                Point::new(center + knob_w * BODY_WIDTH_RATIO, knob_h),
+                Point::new(center + knob_w, knob_h * BODY_SHOULDER_RATIO),
+                Point::new(center + neck_w, knob_h * NECK_BODY_RATIO + cp_jitter[1]),
                 Point::new(center + neck_w, neck_h + cp_jitter[0]),
             ),
             // 5. Neck exit → baseline (right side)
             CubicBez::new(
                 Point::new(center + neck_w, neck_h + cp_jitter[0]),
                 Point::new(center + neck_w, 0.0),
-                Point::new(center + knob_w * 1.2, 0.0),
+                Point::new(center + knob_w * APPROACH_RATIO, 0.0),
                 Point::new(length, 0.0),
             ),
         ]
@@ -183,7 +204,6 @@ mod tests {
     use super::*;
     use crate::edge::TabDirection;
     use crate::seed::create_rng;
-    use kurbo::Point;
 
     fn default_params(direction: TabDirection) -> EdgeParams {
         EdgeParams {

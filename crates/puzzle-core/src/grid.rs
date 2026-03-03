@@ -683,4 +683,43 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn test_generate_connectors_2x2_minimum() {
+        use crate::classic_connector::ClassicKnobConnector;
+
+        // 2x2 is the minimum valid grid; it has no internal h_edges in first/last row
+        // but does have 1 internal h_edge row and 1 internal v_edge column
+        let mut grid = PuzzleGrid::new(test_config(2, 2, "2x2-conn")).unwrap();
+        let connector = ClassicKnobConnector;
+        grid.generate_connectors(&connector);
+
+        // h_edges: 3 rows * 2 cols = 6 total. Row 0 and row 2 are border.
+        // Row 1 (internal): 2 edges should have connectors
+        let internal_h = grid.h_edges.iter().filter(|e| !e.is_border).count();
+        let with_conn_h = grid
+            .h_edges
+            .iter()
+            .filter(|e| e.connector.is_some())
+            .count();
+        assert_eq!(internal_h, 2, "2x2 grid has 2 internal h_edges");
+        assert_eq!(
+            with_conn_h, 2,
+            "all internal h_edges should have connectors"
+        );
+
+        // v_edges: 2 rows * 3 cols = 6 total. Col 0 and col 2 are border.
+        // Col 1 (internal): 2 edges should have connectors
+        let internal_v = grid.v_edges.iter().filter(|e| !e.is_border).count();
+        let with_conn_v = grid
+            .v_edges
+            .iter()
+            .filter(|e| e.connector.is_some())
+            .count();
+        assert_eq!(internal_v, 2, "2x2 grid has 2 internal v_edges");
+        assert_eq!(
+            with_conn_v, 2,
+            "all internal v_edges should have connectors"
+        );
+    }
 }
