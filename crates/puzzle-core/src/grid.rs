@@ -3,6 +3,7 @@ use rand::RngExt;
 use rand_chacha::ChaCha8Rng;
 
 use crate::config::PuzzleConfig;
+use crate::connector::ConnectorGenerator;
 use crate::edge::{Edge, TabDirection};
 use crate::piece::{Piece, PieceEdges, PieceType};
 use crate::seed::create_rng;
@@ -128,6 +129,18 @@ impl PuzzleGrid {
             1 => PieceType::Edge,
             _ => PieceType::Interior,
         }
+    }
+
+    /// Populate connector geometry on all internal edges.
+    ///
+    /// Uses the given `ConnectorGenerator` to produce bezier curves for each
+    /// internal edge. Border edges remain `connector: None`.
+    ///
+    /// RNG iteration order matches grid construction: h_edges row-major,
+    /// then v_edges row-major. A fresh RNG is created from the config seed
+    /// (separate from the construction RNG) for determinism.
+    pub fn generate_connectors(&mut self, _connector: &dyn ConnectorGenerator) {
+        // Stub: does nothing (tests will fail because edges remain None)
     }
 
     /// Generate all pieces in the grid.
@@ -549,6 +562,92 @@ mod tests {
         }
         for e in &grid.v_edges {
             assert!(e.connector.is_none());
+        }
+    }
+
+    // ─── Generate Connectors Tests ───────────────────────────────
+
+    #[test]
+    fn test_generate_connectors_populates_internal_edges() {
+        use crate::classic_connector::ClassicKnobConnector;
+
+        let mut grid = PuzzleGrid::new(test_config(3, 4, "conn-pop")).unwrap();
+        let connector = ClassicKnobConnector;
+        grid.generate_connectors(&connector);
+
+        // All internal edges should have Some connector
+        for edge in &grid.h_edges {
+            if edge.is_border {
+                assert!(
+                    edge.connector.is_none(),
+                    "border edge should have no connector"
+                );
+            } else {
+                assert!(
+                    edge.connector.is_some(),
+                    "internal h_edge should have connector after generate_connectors()"
+                );
+                let curves = edge.connector.as_ref().unwrap();
+                assert!(
+                    !curves.is_empty(),
+                    "internal edge connector should have curves"
+                );
+            }
+        }
+        for edge in &grid.v_edges {
+            if edge.is_border {
+                assert!(
+                    edge.connector.is_none(),
+                    "border edge should have no connector"
+                );
+            } else {
+                assert!(
+                    edge.connector.is_some(),
+                    "internal v_edge should have connector after generate_connectors()"
+                );
+                let curves = edge.connector.as_ref().unwrap();
+                assert!(
+                    !curves.is_empty(),
+                    "internal edge connector should have curves"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_generate_connectors_deterministic() {
+        use crate::classic_connector::ClassicKnobConnector;
+
+        let connector = ClassicKnobConnector;
+
+        let mut grid1 = PuzzleGrid::new(test_config(3, 4, "determ")).unwrap();
+        grid1.generate_connectors(&connector);
+
+        let mut grid2 = PuzzleGrid::new(test_config(3, 4, "determ")).unwrap();
+        grid2.generate_connectors(&connector);
+
+        // Same seed → same connector curves
+        for (e1, e2) in grid1.h_edges.iter().zip(grid2.h_edges.iter()) {
+            match (&e1.connector, &e2.connector) {
+                (None, None) => {}
+                (Some(c1), Some(c2)) => {
+                    assert_eq!(c1.len(), c2.len(), "curve count should match");
+                    for (a, b) in c1.iter().zip(c2.iter()) {
+                        assert!(
+                            (a.p0.x - b.p0.x).abs() < 1e-10
+                                && (a.p0.y - b.p0.y).abs() < 1e-10
+                                && (a.p1.x - b.p1.x).abs() < 1e-10
+                                && (a.p1.y - b.p1.y).abs() < 1e-10
+                                && (a.p2.x - b.p2.x).abs() < 1e-10
+                                && (a.p2.y - b.p2.y).abs() < 1e-10
+                                && (a.p3.x - b.p3.x).abs() < 1e-10
+                                && (a.p3.y - b.p3.y).abs() < 1e-10,
+                            "curves should match for same seed"
+                        );
+                    }
+                }
+                _ => panic!("connector presence should match for same seed"),
+            }
         }
     }
 }
