@@ -58,6 +58,57 @@ function buildConfig(): object {
   };
 }
 
+// ─── URL Param Sync ──────────────────────────────────────────
+
+function loadFromURL(): boolean {
+  const params = new URLSearchParams(window.location.search);
+  if (params.size === 0) return false;
+
+  const rows = parseInt(params.get("rows") ?? "6", 10);
+  const cols = parseInt(params.get("cols") ?? "8", 10);
+  const w = parseFloat(params.get("w") ?? "297");
+  const h = parseFloat(params.get("h") ?? "210");
+  const unitParam = params.get("unit") ?? "mm";
+  const unit = unitParam === "in" ? "Inches" : "Millimeters";
+  const tab = parseInt(params.get("tab") ?? "25", 10) / 100;
+  const jitter = parseInt(params.get("jitter") ?? "50", 10) / 100;
+  const radius = parseFloat(params.get("radius") ?? "2");
+  const kerf = parseFloat(params.get("kerf") ?? "0");
+  const seed = params.get("seed") ?? "";
+
+  rowsInput.value = String(rows);
+  colsInput.value = String(cols);
+  widthInput.value = String(w);
+  heightInput.value = String(h);
+  unitSelect.value = unit;
+  tabSlider.value = String(tab);
+  jitterSlider.value = String(jitter);
+  radiusSlider.value = String(radius);
+  kerfSlider.value = String(kerf);
+  seedInput.value = seed || randomSeed();
+
+  return true;
+}
+
+function updateURL(): void {
+  const config = buildConfig() as Record<string, unknown>;
+  const tabObj = config.tab as { size_pct: number };
+  const jitterObj = config.jitter as { amount: number };
+  const borderObj = config.border as { corner_radius: number };
+  const params = new URLSearchParams();
+  params.set("rows", String(config.rows));
+  params.set("cols", String(config.cols));
+  params.set("w", String(config.width));
+  params.set("h", String(config.height));
+  params.set("unit", config.unit === "Inches" ? "in" : "mm");
+  params.set("tab", String(Math.round(tabObj.size_pct * 100)));
+  params.set("jitter", String(Math.round(jitterObj.amount * 100)));
+  params.set("radius", String(borderObj.corner_radius));
+  params.set("kerf", String(config.kerf_width));
+  params.set("seed", String(config.seed));
+  history.replaceState(null, "", "?" + params.toString());
+}
+
 // ─── SVG Generation ─────────────────────────────────────────
 
 function generatePuzzle(): void {
@@ -91,6 +142,9 @@ function generatePuzzle(): void {
     }
     errorDisplay.style.display = "block";
   }
+
+  // Update URL with current params (replaceState — no history spam)
+  updateURL();
 }
 
 // ─── Readout Updaters ───────────────────────────────────────
@@ -140,11 +194,14 @@ async function main(): Promise<void> {
   radiusReadout = document.getElementById("radius-readout")!;
   kerfReadout = document.getElementById("kerf-readout")!;
 
-  // Initialize slider readouts from default values
-  updateReadouts();
+  // Load params from URL (if any), otherwise generate random seed
+  const hasUrlParams = loadFromURL();
+  if (!hasUrlParams) {
+    seedInput.value = randomSeed();
+  }
 
-  // Generate random seed for initial load
-  seedInput.value = randomSeed();
+  // Initialize slider readouts from current values
+  updateReadouts();
 
   // ─── Event Wiring ───────────────────────────────────────
 
@@ -174,6 +231,50 @@ async function main(): Promise<void> {
   randomizeBtn.addEventListener("click", () => {
     seedInput.value = randomSeed();
     generatePuzzle();
+  });
+
+  // ─── Download SVG ──────────────────────────────────────
+
+  const downloadBtn = document.getElementById("download")!;
+  downloadBtn.addEventListener("click", () => {
+    const svgContent = svgContainer.innerHTML;
+    if (!svgContent) return;
+    const config = buildConfig() as Record<string, unknown>;
+    const filename = `puzzle-${config.rows}x${config.cols}-seed-${config.seed}.svg`;
+    const blob = new Blob([svgContent], { type: "image/svg+xml" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  // ─── Copy Link ─────────────────────────────────────────
+
+  const copyLinkBtn = document.getElementById("copy-link")!;
+  copyLinkBtn.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      const original = copyLinkBtn.textContent;
+      copyLinkBtn.textContent = "Copied!";
+      setTimeout(() => {
+        copyLinkBtn.textContent = original;
+      }, 1500);
+    } catch {
+      // Fallback for non-HTTPS contexts
+      const input = document.createElement("input");
+      input.value = window.location.href;
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand("copy");
+      document.body.removeChild(input);
+      const original = copyLinkBtn.textContent;
+      copyLinkBtn.textContent = "Copied!";
+      setTimeout(() => {
+        copyLinkBtn.textContent = original;
+      }, 1500);
+    }
   });
 
   // ─── Initial Generate ─────────────────────────────────────
