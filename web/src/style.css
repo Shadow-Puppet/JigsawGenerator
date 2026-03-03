@@ -266,6 +266,10 @@ input[type="range"] {
   height: auto;
 }
 
+#svg-container svg path {
+  stroke-width: 0.5px !important;
+}
+
 #piece-count {
   margin-top: 1rem;
   font-size: 0.85rem;
