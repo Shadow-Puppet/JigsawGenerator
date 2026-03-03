@@ -138,9 +138,42 @@ impl PuzzleGrid {
     ///
     /// RNG iteration order matches grid construction: h_edges row-major,
     /// then v_edges row-major. A fresh RNG is created from the config seed
-    /// (separate from the construction RNG) for determinism.
-    pub fn generate_connectors(&mut self, _connector: &dyn ConnectorGenerator) {
-        // Stub: does nothing (tests will fail because edges remain None)
+    /// with a suffix to avoid overlapping with the construction RNG sequence.
+    pub fn generate_connectors(&mut self, connector: &dyn ConnectorGenerator) {
+        use crate::edge::EdgeParams;
+
+        // Create a separate RNG for connector generation (deterministic, independent of grid RNG)
+        let mut rng = create_rng(&format!("{}-connectors", self.config.seed));
+
+        // Generate connectors for horizontal edges
+        for edge in &mut self.h_edges {
+            if edge.is_border {
+                continue;
+            }
+            let params = EdgeParams {
+                length: edge.length(),
+                direction: edge.direction,
+                tab_size: self.config.tab.size_pct,
+                jitter_amount: self.config.jitter.amount,
+            };
+            let curves = connector.generate(&params, &mut rng);
+            edge.connector = Some(curves);
+        }
+
+        // Generate connectors for vertical edges
+        for edge in &mut self.v_edges {
+            if edge.is_border {
+                continue;
+            }
+            let params = EdgeParams {
+                length: edge.length(),
+                direction: edge.direction,
+                tab_size: self.config.tab.size_pct,
+                jitter_amount: self.config.jitter.amount,
+            };
+            let curves = connector.generate(&params, &mut rng);
+            edge.connector = Some(curves);
+        }
     }
 
     /// Generate all pieces in the grid.

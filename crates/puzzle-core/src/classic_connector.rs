@@ -1,8 +1,27 @@
-use kurbo::CubicBez;
+use kurbo::{CubicBez, ParamCurveExtrema, Point};
+use rand::RngExt;
 use rand_chacha::ChaCha8Rng;
 
 use crate::connector::ConnectorGenerator;
-use crate::edge::EdgeParams;
+use crate::edge::{EdgeParams, TabDirection};
+
+/// Ratio of knob height to knob width (height = width * this).
+const KNOB_HEIGHT_RATIO: f64 = 1.2;
+
+/// Neck width as a fraction of knob width (narrower than body for snap-fit).
+const NECK_WIDTH_RATIO: f64 = 0.75;
+
+/// Neck height as a fraction of knob height (how tall the neck is before widening).
+const NECK_HEIGHT_RATIO: f64 = 0.35;
+
+/// Range of center jitter as a fraction of edge length (scaled by jitter_amount).
+const CENTER_JITTER_RANGE: f64 = 0.05;
+
+/// Range of control point jitter as a fraction of edge length (scaled by jitter_amount).
+const CP_JITTER_RANGE: f64 = 0.03;
+
+/// How far beyond the knob top the control points overshoot (creates rounded top).
+const TOP_OVERSHOOT: f64 = 1.05;
 
 /// Classic jigsaw knob connector generator.
 ///
@@ -10,21 +29,151 @@ use crate::edge::EdgeParams;
 /// in edge-local coordinates. Each knob has a visible neck (narrower than the body)
 /// for interlocking snap-fit of laser-cut pieces.
 ///
-/// The knob shape consists of 5 cubic bezier segments:
-/// 1. Baseline to neck entry (left side)
-/// 2. Neck to knob body (widening)
+/// ## Knob Anatomy (edge-local, direction=Out)
+///
+/// ```text
+/// Edge baseline: y=0, x from 0 to length
+/// Knob center: x ≈ length/2 (+ jitter), y = knob_h
+///
+///   [flat]──[neck-in]──[body-out]──[top-round]──[body-out]──[neck-in]──[flat]
+///            narrowing   widening    rounded top   narrowing
+///
+/// The neck narrowing is what makes laser-cut pieces snap together.
+/// ```
+///
+/// The shape consists of 5 cubic bezier segments:
+/// 1. Baseline → neck entry (left side)
+/// 2. Neck → knob body (widening)
 /// 3. Knob top (rounded bell curve)
-/// 4. Knob body to neck (narrowing, mirror of segment 2)
-/// 5. Neck exit to baseline (right side)
+/// 4. Knob body → neck (narrowing, mirror of segment 2)
+/// 5. Neck exit → baseline (right side)
 pub struct ClassicKnobConnector;
 
 impl ConnectorGenerator for ClassicKnobConnector {
-    fn generate(&self, _params: &EdgeParams, _rng: &mut ChaCha8Rng) -> Vec<CubicBez> {
-        // Stub: returns empty vec (tests will fail against this)
-        Vec::new()
+    fn generate(&self, params: &EdgeParams, rng: &mut ChaCha8Rng) -> Vec<CubicBez> {
+        let length = params.length;
+        let jitter = params.jitter_amount;
+
+        // Direction sign: +1.0 for Out (knob extends in +Y), -1.0 for In
+        let dir_sign = match params.direction {
+            TabDirection::Out => 1.0,
+            TabDirection::In => -1.0,
+        };
+
+        // Compute center offset with jitter
+        let center_jitter =
+            jitter * rng.random_range(-CENTER_JITTER_RANGE..CENTER_JITTER_RANGE) * length;
+        let center = length * 0.5 + center_jitter;
+
+        // Knob dimensions
+        let knob_w = length * params.tab_size;
+        let knob_h = knob_w * KNOB_HEIGHT_RATIO * dir_sign;
+        let neck_w = knob_w * NECK_WIDTH_RATIO;
+        let neck_h = knob_h * NECK_HEIGHT_RATIO;
+
+        // Control point jitter values (4 independent perturbations)
+        let cp_jitter: [f64; 4] = [
+            jitter * rng.random_range(-CP_JITTER_RANGE..CP_JITTER_RANGE) * length,
+            jitter * rng.random_range(-CP_JITTER_RANGE..CP_JITTER_RANGE) * length,
+            jitter * rng.random_range(-CP_JITTER_RANGE..CP_JITTER_RANGE) * length,
+            jitter * rng.random_range(-CP_JITTER_RANGE..CP_JITTER_RANGE) * length,
+        ];
+
+        // Build 5 cubic bezier segments
+        vec![
+            // 1. Baseline → neck entry (left side)
+            CubicBez::new(
+                Point::new(0.0, 0.0),
+                Point::new(center - knob_w * 1.2, 0.0),
+                Point::new(center - neck_w, 0.0),
+                Point::new(center - neck_w, neck_h + cp_jitter[0]),
+            ),
+            // 2. Neck → knob body (left side, widening)
+            CubicBez::new(
+                Point::new(center - neck_w, neck_h + cp_jitter[0]),
+                Point::new(center - neck_w, knob_h * 0.6 + cp_jitter[1]),
+                Point::new(center - knob_w, knob_h * 0.85),
+                Point::new(center - knob_w * 0.3, knob_h),
+            ),
+            // 3. Knob top (rounded)
+            CubicBez::new(
+                Point::new(center - knob_w * 0.3, knob_h),
+                Point::new(center - knob_w * 0.1, knob_h * TOP_OVERSHOOT + cp_jitter[2]),
+                Point::new(center + knob_w * 0.1, knob_h * TOP_OVERSHOOT + cp_jitter[3]),
+                Point::new(center + knob_w * 0.3, knob_h),
+            ),
+            // 4. Knob body → neck (right side, narrowing)
+            CubicBez::new(
+                Point::new(center + knob_w * 0.3, knob_h),
+                Point::new(center + knob_w, knob_h * 0.85),
+                Point::new(center + neck_w, knob_h * 0.6 + cp_jitter[1]),
+                Point::new(center + neck_w, neck_h + cp_jitter[0]),
+            ),
+            // 5. Neck exit → baseline (right side)
+            CubicBez::new(
+                Point::new(center + neck_w, neck_h + cp_jitter[0]),
+                Point::new(center + neck_w, 0.0),
+                Point::new(center + knob_w * 1.2, 0.0),
+                Point::new(length, 0.0),
+            ),
+        ]
     }
 
-    fn validate(&self, _curves: &[CubicBez], _params: &EdgeParams) -> Result<(), String> {
+    fn validate(&self, curves: &[CubicBez], params: &EdgeParams) -> Result<(), String> {
+        if curves.is_empty() {
+            return Err("no curves to validate".to_string());
+        }
+
+        // Check first point is at origin
+        let first_p0 = curves[0].p0;
+        if first_p0.x.abs() > 1e-6 || first_p0.y.abs() > 1e-6 {
+            return Err(format!(
+                "first curve p0 should be (0,0), got ({}, {})",
+                first_p0.x, first_p0.y
+            ));
+        }
+
+        // Check last point is at (length, 0)
+        let last_p3 = curves[curves.len() - 1].p3;
+        if (last_p3.x - params.length).abs() > 1e-6 || last_p3.y.abs() > 1e-6 {
+            return Err(format!(
+                "last curve p3 should be ({}, 0), got ({}, {})",
+                params.length, last_p3.x, last_p3.y
+            ));
+        }
+
+        // Check continuity between segments
+        for i in 1..curves.len() {
+            let prev_end = curves[i - 1].p3;
+            let curr_start = curves[i].p0;
+            let gap =
+                ((prev_end.x - curr_start.x).powi(2) + (prev_end.y - curr_start.y).powi(2)).sqrt();
+            if gap > 1e-6 {
+                return Err(format!(
+                    "gap between curve {} and {}: {} (max 1e-6)",
+                    i - 1,
+                    i,
+                    gap
+                ));
+            }
+        }
+
+        // Check bounding box doesn't exceed 5% beyond nominal piece boundary
+        let margin = params.length * 0.05;
+        for (i, curve) in curves.iter().enumerate() {
+            let bbox = curve.bounding_box();
+            if bbox.x0 < -margin
+                || bbox.x1 > params.length + margin
+                || bbox.y0 < -params.length - margin
+                || bbox.y1 > params.length + margin
+            {
+                return Err(format!(
+                    "curve {} bounding box ({:?}) exceeds 5% margin",
+                    i, bbox
+                ));
+            }
+        }
+
         Ok(())
     }
 }
