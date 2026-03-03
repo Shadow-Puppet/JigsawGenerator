@@ -65,7 +65,10 @@ Plans:
   2. SVG preview updates live as the user changes any parameter, with no perceptible lag for puzzles up to 20×20
   3. User can download the generated SVG as a file ready for laser cutter import
   4. User can share a puzzle configuration via URL — opening the shared URL reproduces the exact same puzzle
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 04-01-PLAN.md — Controls panel + live SVG preview with instant regeneration
+- [ ] 04-02-PLAN.md — URL sharing, SVG download, copy link + visual verification
 
 ## Progress
 
@@ -74,7 +77,7 @@ Plans:
 | 1. Build Pipeline & WASM Foundation | 1/1 | Complete | 2026-03-02 |
 | 2. Grid Engine & Data Model | 3/3 | Complete | 2026-03-03 |
 | 3. Connector Generation & SVG Export | 0/2 | Planned | - |
-| 4. Web GUI & Live Preview | 0/? | Not started | - |
+| 4. Web GUI & Live Preview | 0/2 | Planned | - |
 
 ## Coverage Map
 
