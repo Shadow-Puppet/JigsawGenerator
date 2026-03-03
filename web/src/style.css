@@ -12,8 +12,11 @@ body {
   line-height: 1.6;
   color: #1a1a1a;
   background: #fafafa;
-  padding: 2rem 1rem;
+  height: 100vh;
+  overflow: hidden;
 }
+
+/* ─── Loading State ────────────────────────────────────────── */
 
 #loading {
   text-align: center;
@@ -22,28 +25,55 @@ body {
   font-size: 1.1rem;
 }
 
-#app {
-  max-width: 480px;
-  margin: 0 auto;
+/* ─── Layout ───────────────────────────────────────────────── */
+
+.layout {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  height: 100vh;
 }
 
-h1 {
-  font-size: 1.5rem;
-  margin-bottom: 0.25rem;
-}
+/* ─── Controls Panel ───────────────────────────────────────── */
 
-p {
-  color: #555;
-  margin-bottom: 1.5rem;
-  font-size: 0.95rem;
-}
-
-form {
+.controls-panel {
+  padding: 1.5rem;
+  border-right: 1px solid #e0e0e0;
+  overflow-y: auto;
+  height: 100vh;
+  background: #fff;
   display: flex;
-  gap: 1rem;
-  align-items: flex-end;
-  margin-bottom: 1.5rem;
+  flex-direction: column;
 }
+
+.controls-panel h1 {
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin-bottom: 1.25rem;
+  color: #1a1a1a;
+}
+
+/* ─── Control Sections ─────────────────────────────────────── */
+
+.control-section {
+  margin-bottom: 1.25rem;
+}
+
+.section-header {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #888;
+  margin-bottom: 0.5rem;
+}
+
+.control-row {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-end;
+}
+
+/* ─── Inputs ───────────────────────────────────────────────── */
 
 .input-group {
   display: flex;
@@ -51,19 +81,20 @@ form {
   gap: 0.25rem;
 }
 
-label {
-  font-size: 0.85rem;
+.input-group label {
+  font-size: 0.8rem;
   font-weight: 500;
   color: #444;
 }
 
 input[type="number"] {
   width: 80px;
-  padding: 0.5rem 0.75rem;
+  padding: 0.4rem 0.5rem;
   border: 1px solid #ccc;
   border-radius: 6px;
-  font-size: 1rem;
+  font-size: 0.9rem;
   background: #fff;
+  color: #1a1a1a;
 }
 
 input[type="number"]:focus {
@@ -72,55 +103,216 @@ input[type="number"]:focus {
   box-shadow: 0 0 0 2px rgba(74, 144, 217, 0.2);
 }
 
-button {
-  padding: 0.5rem 1.25rem;
+input[type="text"] {
+  padding: 0.4rem 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  background: #fff;
+  color: #1a1a1a;
+}
+
+input[type="text"]:focus {
+  outline: none;
+  border-color: #4a90d9;
+  box-shadow: 0 0 0 2px rgba(74, 144, 217, 0.2);
+}
+
+select {
+  padding: 0.4rem 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  background: #fff;
+  color: #1a1a1a;
+  cursor: pointer;
+}
+
+select:focus {
+  outline: none;
+  border-color: #4a90d9;
+  box-shadow: 0 0 0 2px rgba(74, 144, 217, 0.2);
+}
+
+/* ─── Sliders ──────────────────────────────────────────────── */
+
+.slider-group {
+  margin-bottom: 0.75rem;
+}
+
+.slider-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 0.25rem;
+}
+
+.slider-label label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #444;
+}
+
+.readout {
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  color: #555;
+  min-width: 3ch;
+  text-align: right;
+}
+
+input[type="range"] {
+  width: 100%;
+  accent-color: #4a90d9;
+  cursor: pointer;
+}
+
+/* ─── Seed ─────────────────────────────────────────────────── */
+
+.seed-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.seed-row input[type="text"] {
+  flex: 1;
+  min-width: 0;
+}
+
+.seed-row button {
+  padding: 0.4rem 0.65rem;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+/* ─── Action Buttons ───────────────────────────────────────── */
+
+.actions {
+  margin-top: auto;
+  padding-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.btn-primary {
+  width: 100%;
+  padding: 0.55rem 1rem;
   border: none;
   border-radius: 6px;
   background: #4a90d9;
   color: #fff;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   font-weight: 500;
   cursor: pointer;
   transition: background 0.15s;
 }
 
-button:hover {
+.btn-primary:hover {
   background: #3a7bc8;
 }
 
-button:active {
+.btn-primary:active {
   background: #2d6bb5;
 }
 
-#result {
-  padding: 1rem 1.25rem;
+.btn-secondary {
+  width: 100%;
+  padding: 0.55rem 1rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
   background: #fff;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  min-height: 2rem;
+  color: #444;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
 }
 
-#result:empty {
+.btn-secondary:hover {
+  background: #f5f5f5;
+  border-color: #bbb;
+}
+
+.btn-secondary:active {
+  background: #eee;
+}
+
+/* ─── Preview Area ─────────────────────────────────────────── */
+
+.preview-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  overflow: hidden;
+  background: #fafafa;
+}
+
+#svg-container {
+  width: 100%;
+  max-height: calc(100vh - 120px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#svg-container svg {
+  max-width: 100%;
+  max-height: calc(100vh - 160px);
+  height: auto;
+}
+
+#piece-count {
+  margin-top: 1rem;
+  font-size: 0.85rem;
+  color: #555;
+}
+
+#piece-count:empty {
   display: none;
 }
 
-#result .breakdown {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.5rem 1.5rem;
-}
-
-#result .breakdown dt {
-  font-size: 0.85rem;
-  color: #666;
-}
-
-#result .breakdown dd {
-  font-size: 1.25rem;
-  font-weight: 600;
-}
-
-.error {
+#error-display {
   color: #c0392b;
   font-weight: 500;
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+  display: none;
+}
+
+/* ─── Mobile Responsive ────────────────────────────────────── */
+
+@media (max-width: 768px) {
+  body {
+    overflow: auto;
+    height: auto;
+  }
+
+  .layout {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .controls-panel {
+    height: auto;
+    border-right: none;
+    border-bottom: 1px solid #e0e0e0;
+  }
+
+  .preview-area {
+    min-height: 50vh;
+    padding: 1rem;
+  }
+
+  #svg-container svg {
+    max-height: 60vh;
+  }
+
+  .actions {
+    margin-top: 1rem;
+  }
 }
