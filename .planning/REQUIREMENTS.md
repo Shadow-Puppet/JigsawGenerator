@@ -24,8 +24,8 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Export
 
-- [ ] **EXPT-01**: User can export puzzle as SVG with laser-cutter compatible strokes
-- [ ] **EXPT-02**: User can apply kerf compensation to adjust path offsets for snug piece fit
+- [x] **EXPT-01**: User can export puzzle as SVG with laser-cutter compatible strokes
+- [x] **EXPT-02**: User can apply kerf compensation to adjust path offsets for snug piece fit
 
 ### GUI & Preview
 
@@ -94,8 +94,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | INFR-02 | Phase 2 | Complete |
 | CONN-01 | Phase 3 | Complete |
 | CONN-02 | Phase 3 | Complete |
-| EXPT-01 | Phase 3 | Pending |
-| EXPT-02 | Phase 3 | Pending |
+| EXPT-01 | Phase 3 | Complete |
+| EXPT-02 | Phase 3 | Complete |
 | GUI-01 | Phase 4 | Pending |
 | GUI-02 | Phase 4 | Pending |
 | GUI-03 | Phase 4 | Pending |

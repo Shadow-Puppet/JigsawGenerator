@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: in-progress
-stopped_at: "Completed 03-01-PLAN.md"
-last_updated: "2026-03-03T03:08:47Z"
+status: executing
+stopped_at: Completed 03-02-PLAN.md
+last_updated: "2026-03-03T03:20:51.434Z"
 progress:
-  total_phases: 4
-  completed_phases: 2
+  total_phases: 3
+  completed_phases: 3
   total_plans: 6
-  completed_plans: 5
+  completed_plans: 6
 ---
 
 # Project State: Puzzle Pattern Generator
@@ -18,18 +18,18 @@ progress:
 
 **Core Value:** Generate geometrically valid, laser-cuttable jigsaw puzzle SVG patterns with configurable dimensions and procedural variation so no two puzzles are identical.
 
-**Current Focus:** Phase 3 in progress. ClassicKnobConnector implemented with TDD. SVG export pipeline next.
+**Current Focus:** Phase 3 complete. SVG export pipeline and WASM endpoint ready. Phase 4 (Web GUI) next.
 
 ## Current Position
 
-**Phase:** 03-connector-generation-svg-export
-**Plan:** 01 of 2 (complete)
+**Phase:** 04-web-gui-live-preview
+**Plan:** 0 of ? (pending planning)
 **Status:** In Progress
 
 ```
 Phase 1 [x] Build Pipeline & WASM Foundation
 Phase 2 [x] Grid Engine & Data Model (3/3 plans)
-Phase 3 [~] Connector Generation & SVG Export (1/2 plans)
+Phase 3 [x] Connector Generation & SVG Export (2/2 plans)
 Phase 4 [ ] Web GUI & Live Preview
 ```
 
@@ -37,15 +37,16 @@ Phase 4 [ ] Web GUI & Live Preview
 
 | Metric | Value |
 |--------|-------|
-| Phases complete | 2/4 |
-| Plans complete | 5/6 |
-| Tasks complete | 12/12 |
-| Requirements met | 13/16 |
+| Phases complete | 3/4 |
+| Plans complete | 6/6 |
+| Tasks complete | 14/14 |
+| Requirements met | 15/16 |
 | 01-01 duration | 6 min |
 | 02-01 duration | 4 min |
 | 02-02 duration | 3 min |
 | 02-03 duration | 2 min |
 | 03-01 duration | 5 min |
+| 03-02 duration | 6 min |
 
 ## Accumulated Context
 
@@ -67,10 +68,14 @@ Phase 4 [ ] Web GUI & Live Preview
 - Empty seed defaults to "default" in WASM layer; JS generates random seeds in Phase 4
 - Separate RNG for connector generation (seed suffix '-connectors') preserves grid construction determinism
 - 5 cubic bezier segments per knob: baseline→neck, neck→body, top, body→neck, neck→baseline
-- Neck width 75% of body width creates visible narrowing for snap-fit
+    - Neck width 75% of body width creates visible narrowing for snap-fit
+- Single <path> element for all cut lines — border closed subpath + internal edge open subpaths
+- Kerf compensation via polyline offset with miter/bevel joins (no re-smoothing for v1)
+- kurbo::Arc for quarter-circle rounded corners → cubic bezier approximation
+- Affine transform (translate * rotate) for edge-local to global coordinate mapping
 
 ### Research Flags
-- **Phase 3 (Connectors):** Classic knob algorithm implemented and validated via TDD. SVG export pipeline next.
+- **Phase 3 (Connectors):** Complete. Connector generation + SVG export pipeline fully functional.
 - **Phase 4 (GUI):** Standard patterns, no research needed.
 
 ### Learnings
@@ -78,6 +83,8 @@ Phase 4 [ ] Web GUI & Live Preview
 - WASM release build with wasm-opt produces ~56KB gzipped with grid engine (was ~48KB with minimal logic)
 - rand 0.10: `random_bool`/`random`/`random_range` are on `RngExt` trait, not just `Rng`
 - kurbo `bounding_box()` requires importing `ParamCurveExtrema` trait
+- kurbo BezPath.to_svg() outputs absolute uppercase commands (M, L, C, Z) — perfect for laser cutter SVG
+- WASM binary with full SVG export pipeline is ~93KB gzipped (up from ~56KB with grid engine only)
 
 ### TODOs
 (None yet)
@@ -87,9 +94,9 @@ Phase 4 [ ] Web GUI & Live Preview
 
 ## Session Continuity
 
-**Last session:** 2026-03-03T03:08:47Z
-**Stopped at:** Completed 03-01-PLAN.md
-**Next action:** Execute Plan 02 (`/gsd-execute-phase 03-connector-generation-svg-export`)
+**Last session:** 2026-03-03T03:20:51.432Z
+**Stopped at:** Completed 03-02-PLAN.md
+**Next action:** Plan Phase 4 (`/gsd-plan-phase 04-web-gui-live-preview`)
 
 ---
-*Last updated: 2026-03-03T03:08:47Z*
+*Last updated: 2026-03-03T03:18:32Z*
