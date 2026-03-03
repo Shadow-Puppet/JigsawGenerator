@@ -1,7 +1,9 @@
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
-use puzzle_core::{compute_piece_breakdown, GridConfig, PieceType, PuzzleConfig, PuzzleGrid};
+use puzzle_core::{
+    compute_piece_breakdown, ClassicKnobConnector, GridConfig, PieceType, PuzzleConfig, PuzzleGrid,
+};
 
 /// Initialize the panic hook for better error messages in the browser console.
 #[wasm_bindgen]
@@ -201,6 +203,44 @@ pub fn generate_grid(config_json: &str) -> String {
         .unwrap_or_else(|e| format!(r#"{{"error":"Serialization error: {}"}}"#, e))
 }
 
+/// Generate a laser-cutter-ready SVG from a JSON configuration string.
+///
+/// Accepts full PuzzleConfig JSON (same as `generate_grid`), with optional
+/// `kerf_width` field (defaults to 0.0 if omitted for backward compatibility).
+///
+/// Returns a complete SVG string with:
+/// - Physical mm dimensions and viewBox
+/// - Single `<path>` with all cut lines (border + connectors)
+/// - Hairline black stroke, no fill
+/// - Optional kerf compensation when `kerf_width > 0`
+///
+/// On error: `{"error": "message"}`
+#[wasm_bindgen]
+pub fn generate_svg(config_json: &str) -> String {
+    // 1. Deserialize PuzzleConfig from JSON
+    let mut config: PuzzleConfig = match serde_json::from_str(config_json) {
+        Ok(c) => c,
+        Err(e) => return format!(r#"{{"error":"Invalid JSON: {}"}}"#, e),
+    };
+
+    // Handle empty seed: use fixed default since WASM has no OS entropy.
+    if config.seed.is_empty() {
+        config.seed = "default".to_string();
+    }
+
+    // 2. Create PuzzleGrid (validates config internally)
+    let mut grid = match PuzzleGrid::new(config) {
+        Ok(g) => g,
+        Err(e) => return format!(r#"{{"error":"{}"}}"#, e),
+    };
+
+    // 3. Generate connectors on all internal edges
+    grid.generate_connectors(&ClassicKnobConnector);
+
+    // 4. Generate and return SVG
+    puzzle_core::generate_svg(&grid)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -336,5 +376,85 @@ mod tests {
         assert!(value.get("piece_breakdown").is_some());
         assert!(value.get("edge_summary").is_some());
         assert!(value.get("pieces").is_some());
+    }
+
+    // ─── generate_svg Tests ───────────────────────────────────────
+
+    #[test]
+    fn test_generate_svg_returns_svg() {
+        let config_json = r#"{"rows":3,"cols":4,"width":200.0,"height":150.0,"unit":"Millimeters","tab":{"size_pct":0.25},"jitter":{"amount":0.5},"border":{"corner_radius":2.0},"seed":"svg-test"}"#;
+        let result = generate_svg(config_json);
+        assert!(
+            result.starts_with("<svg"),
+            "should start with <svg, got: {}...",
+            &result[..50.min(result.len())]
+        );
+        assert!(result.contains("</svg>"), "should contain </svg>");
+        assert!(!result.contains(r#""error""#), "should not be error JSON");
+    }
+
+    #[test]
+    fn test_generate_svg_has_connectors() {
+        let config_json = r#"{"rows":3,"cols":4,"width":200.0,"height":150.0,"unit":"Millimeters","tab":{"size_pct":0.25},"jitter":{"amount":0.5},"border":{"corner_radius":2.0},"seed":"conn-svg"}"#;
+        let result = generate_svg(config_json);
+        // Extract path data
+        let d_start = result.find("d='").expect("should have d attribute") + 3;
+        let d_end = result[d_start..].find('\'').unwrap() + d_start;
+        let path_data = &result[d_start..d_end];
+        assert!(
+            path_data.contains('C'),
+            "path data should contain C commands (cubic bezier curves from connectors)"
+        );
+    }
+
+    #[test]
+    fn test_generate_svg_with_kerf() {
+        let config_no_kerf = r#"{"rows":3,"cols":4,"width":200.0,"height":150.0,"unit":"Millimeters","tab":{"size_pct":0.25},"jitter":{"amount":0.5},"border":{"corner_radius":2.0},"seed":"kerf-test","kerf_width":0.0}"#;
+        let config_with_kerf = r#"{"rows":3,"cols":4,"width":200.0,"height":150.0,"unit":"Millimeters","tab":{"size_pct":0.25},"jitter":{"amount":0.5},"border":{"corner_radius":2.0},"seed":"kerf-test","kerf_width":0.1}"#;
+        let svg_no_kerf = generate_svg(config_no_kerf);
+        let svg_with_kerf = generate_svg(config_with_kerf);
+
+        // Both should be valid SVGs
+        assert!(
+            svg_no_kerf.starts_with("<svg"),
+            "no-kerf should be valid SVG"
+        );
+        assert!(
+            svg_with_kerf.starts_with("<svg"),
+            "with-kerf should be valid SVG"
+        );
+
+        // They should differ (kerf changes the path data)
+        assert_ne!(svg_no_kerf, svg_with_kerf, "kerf should change SVG output");
+    }
+
+    #[test]
+    fn test_generate_svg_deterministic() {
+        let config_json = r#"{"rows":3,"cols":4,"width":200.0,"height":150.0,"unit":"Millimeters","tab":{"size_pct":0.25},"jitter":{"amount":0.5},"border":{"corner_radius":2.0},"seed":"determ-svg"}"#;
+        let svg1 = generate_svg(config_json);
+        let svg2 = generate_svg(config_json);
+        assert_eq!(svg1, svg2, "same config must produce identical SVG");
+    }
+
+    #[test]
+    fn test_generate_svg_invalid_json() {
+        let result = generate_svg("not valid json");
+        assert!(
+            result.contains(r#""error""#),
+            "should return error JSON for invalid input"
+        );
+    }
+
+    #[test]
+    fn test_generate_svg_backward_compat() {
+        // Config JSON without kerf_width field — should default to 0.0
+        let config_json = r#"{"rows":3,"cols":4,"width":200.0,"height":150.0,"unit":"Millimeters","tab":{"size_pct":0.25},"jitter":{"amount":0.5},"border":{"corner_radius":2.0},"seed":"compat-test"}"#;
+        let result = generate_svg(config_json);
+        assert!(
+            result.starts_with("<svg"),
+            "should produce valid SVG without kerf_width in JSON, got: {}...",
+            &result[..50.min(result.len())]
+        );
+        assert!(!result.contains(r#""error""#), "should not be an error");
     }
 }
