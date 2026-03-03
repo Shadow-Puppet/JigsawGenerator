@@ -18,8 +18,8 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Connectors
 
-- [ ] **CONN-01**: Puzzle generates classic knob connector shapes using cubic bezier curves
-- [ ] **CONN-02**: Each edge is procedurally varied (random direction, control point jitter)
+- [x] **CONN-01**: Puzzle generates classic knob connector shapes using cubic bezier curves
+- [x] **CONN-02**: Each edge is procedurally varied (random direction, control point jitter)
 - [x] **CONN-03**: User can set a seed value to reproduce exact puzzle configurations
 
 ### Export
@@ -92,8 +92,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | GRID-06 | Phase 2 | Complete |
 | CONN-03 | Phase 2 | Complete |
 | INFR-02 | Phase 2 | Complete |
-| CONN-01 | Phase 3 | Pending |
-| CONN-02 | Phase 3 | Pending |
+| CONN-01 | Phase 3 | Complete |
+| CONN-02 | Phase 3 | Complete |
 | EXPT-01 | Phase 3 | Pending |
 | EXPT-02 | Phase 3 | Pending |
 | GUI-01 | Phase 4 | Pending |
