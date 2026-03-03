@@ -9,8 +9,8 @@
 
 - [x] **Phase 1: Build Pipeline & WASM Foundation** - Rust→WASM→browser build pipeline with round-trip proof
 - [x] **Phase 2: Grid Engine & Data Model** - Grid layout, shared-edge architecture, seeded RNG, pluggable connector trait
-- [ ] **Phase 3: Connector Generation & SVG Export** - Classic knob connectors, procedural variation, laser-cutter-compatible SVG output
-- [ ] **Phase 4: Web GUI & Live Preview** - Parameter controls, live SVG preview, SVG download, URL sharing
+- [x] **Phase 3: Connector Generation & SVG Export** - Classic knob connectors, procedural variation, laser-cutter-compatible SVG output
+- [~] **Phase 4: Web GUI & Live Preview** - Parameter controls, live SVG preview, SVG download, URL sharing
 
 ## Phase Details
 
@@ -53,8 +53,8 @@ Plans:
   4. Generated SVG contains no overlapping paths, no gaps between adjacent pieces, and border pieces have rounded corners matching the configured radius
 **Plans:** 2 plans
 Plans:
-- [ ] 03-01-PLAN.md — ClassicKnobConnector implementation with TDD (knob shape, jitter, grid wiring)
-- [ ] 03-02-PLAN.md — SVG export pipeline with kerf compensation and WASM endpoint
+- [x] 03-01-PLAN.md — ClassicKnobConnector implementation with TDD (knob shape, jitter, grid wiring)
+- [x] 03-02-PLAN.md — SVG export pipeline with kerf compensation and WASM endpoint
 
 ### Phase 4: Web GUI & Live Preview
 **Goal**: Users can configure, preview, and export puzzles entirely in the browser through an intuitive web interface
@@ -67,7 +67,7 @@ Plans:
   4. User can share a puzzle configuration via URL — opening the shared URL reproduces the exact same puzzle
 **Plans:** 2 plans
 Plans:
-- [ ] 04-01-PLAN.md — Controls panel + live SVG preview with instant regeneration
+- [x] 04-01-PLAN.md — Controls panel + live SVG preview with instant regeneration
 - [ ] 04-02-PLAN.md — URL sharing, SVG download, copy link + visual verification
 
 ## Progress
@@ -76,8 +76,8 @@ Plans:
 |-------|----------------|--------|-----------|
 | 1. Build Pipeline & WASM Foundation | 1/1 | Complete | 2026-03-02 |
 | 2. Grid Engine & Data Model | 3/3 | Complete | 2026-03-03 |
-| 3. Connector Generation & SVG Export | 0/2 | Planned | - |
-| 4. Web GUI & Live Preview | 0/2 | Planned | - |
+| 3. Connector Generation & SVG Export | 2/2 | Complete | 2026-03-03 |
+| 4. Web GUI & Live Preview | 1/2 | In Progress | - |
 
 ## Coverage Map
 
@@ -105,4 +105,4 @@ Orphaned: 0
 
 ---
 *Roadmap created: 2026-03-01*
-*Last updated: 2026-03-03*
+*Last updated: 2026-03-03T22:00:00Z*

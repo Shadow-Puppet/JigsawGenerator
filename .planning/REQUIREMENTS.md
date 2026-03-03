@@ -29,8 +29,8 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### GUI & Preview
 
-- [ ] **GUI-01**: User can configure all parameters via web-based controls (sliders, inputs)
-- [ ] **GUI-02**: User sees live SVG preview that updates as parameters change
+- [x] **GUI-01**: User can configure all parameters via web-based controls (sliders, inputs)
+- [x] **GUI-02**: User sees live SVG preview that updates as parameters change
 - [ ] **GUI-03**: User can share puzzle configuration via URL
 
 ### Infrastructure
@@ -96,8 +96,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CONN-02 | Phase 3 | Complete |
 | EXPT-01 | Phase 3 | Complete |
 | EXPT-02 | Phase 3 | Complete |
-| GUI-01 | Phase 4 | Pending |
-| GUI-02 | Phase 4 | Pending |
+| GUI-01 | Phase 4 | Complete |
+| GUI-02 | Phase 4 | Complete |
 | GUI-03 | Phase 4 | Pending |
 
 **Coverage:**
