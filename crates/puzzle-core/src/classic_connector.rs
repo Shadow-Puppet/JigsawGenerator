@@ -17,9 +17,6 @@ const NECK_HEIGHT_RATIO: f64 = 0.35;
 /// Range of center jitter as a fraction of edge length (scaled by jitter_amount).
 const CENTER_JITTER_RANGE: f64 = 0.05;
 
-/// Range of control point jitter as a fraction of edge length (scaled by jitter_amount).
-const CP_JITTER_RANGE: f64 = 0.03;
-
 /// How far beyond the knob top the control points overshoot (creates rounded top).
 const TOP_OVERSHOOT: f64 = 1.05;
 
@@ -86,14 +83,6 @@ impl ConnectorGenerator for ClassicKnobConnector {
         let neck_w = knob_w * params.neck_ratio;
         let neck_h = knob_h * NECK_HEIGHT_RATIO;
 
-        // Control point jitter values (4 independent perturbations)
-        let cp_jitter: [f64; 4] = [
-            jitter * rng.random_range(-CP_JITTER_RANGE..CP_JITTER_RANGE) * length,
-            jitter * rng.random_range(-CP_JITTER_RANGE..CP_JITTER_RANGE) * length,
-            jitter * rng.random_range(-CP_JITTER_RANGE..CP_JITTER_RANGE) * length,
-            jitter * rng.random_range(-CP_JITTER_RANGE..CP_JITTER_RANGE) * length,
-        ];
-
         // Build 5 cubic bezier segments
         vec![
             // 1. Baseline → neck entry (left side)
@@ -101,38 +90,32 @@ impl ConnectorGenerator for ClassicKnobConnector {
                 Point::new(0.0, 0.0),
                 Point::new(center - knob_w * APPROACH_RATIO, 0.0),
                 Point::new(center - neck_w, 0.0),
-                Point::new(center - neck_w, neck_h + cp_jitter[0]),
+                Point::new(center - neck_w, neck_h),
             ),
             // 2. Neck → knob body (left side, widening)
             CubicBez::new(
-                Point::new(center - neck_w, neck_h + cp_jitter[0]),
-                Point::new(center - neck_w, knob_h * NECK_BODY_RATIO + cp_jitter[1]),
+                Point::new(center - neck_w, neck_h),
+                Point::new(center - neck_w, knob_h * NECK_BODY_RATIO),
                 Point::new(center - knob_w, knob_h * BODY_SHOULDER_RATIO),
                 Point::new(center - knob_w * BODY_WIDTH_RATIO, knob_h),
             ),
             // 3. Knob top (rounded)
             CubicBez::new(
                 Point::new(center - knob_w * BODY_WIDTH_RATIO, knob_h),
-                Point::new(
-                    center - knob_w * TOP_WIDTH_RATIO,
-                    knob_h * TOP_OVERSHOOT + cp_jitter[2],
-                ),
-                Point::new(
-                    center + knob_w * TOP_WIDTH_RATIO,
-                    knob_h * TOP_OVERSHOOT + cp_jitter[3],
-                ),
+                Point::new(center - knob_w * TOP_WIDTH_RATIO, knob_h * TOP_OVERSHOOT),
+                Point::new(center + knob_w * TOP_WIDTH_RATIO, knob_h * TOP_OVERSHOOT),
                 Point::new(center + knob_w * BODY_WIDTH_RATIO, knob_h),
             ),
             // 4. Knob body → neck (right side, narrowing)
             CubicBez::new(
                 Point::new(center + knob_w * BODY_WIDTH_RATIO, knob_h),
                 Point::new(center + knob_w, knob_h * BODY_SHOULDER_RATIO),
-                Point::new(center + neck_w, knob_h * NECK_BODY_RATIO + cp_jitter[1]),
-                Point::new(center + neck_w, neck_h + cp_jitter[0]),
+                Point::new(center + neck_w, knob_h * NECK_BODY_RATIO),
+                Point::new(center + neck_w, neck_h),
             ),
             // 5. Neck exit → baseline (right side)
             CubicBez::new(
-                Point::new(center + neck_w, neck_h + cp_jitter[0]),
+                Point::new(center + neck_w, neck_h),
                 Point::new(center + neck_w, 0.0),
                 Point::new(center + knob_w * APPROACH_RATIO, 0.0),
                 Point::new(length, 0.0),
@@ -327,7 +310,7 @@ mod tests {
     // ─── Variation Tests ──────────────────────────────────────────
 
     #[test]
-    fn test_jitter_produces_variation() {
+    fn test_jitter_shifts_center_position() {
         let connector = ClassicKnobConnector;
         let params = default_params(TabDirection::Out);
 
@@ -339,17 +322,47 @@ mod tests {
 
         assert!(!curves1.is_empty() && !curves2.is_empty(), "need curves");
 
-        // At least one control point should differ
-        let any_diff = curves1.iter().zip(curves2.iter()).any(|(c1, c2)| {
-            (c1.p1.x - c2.p1.x).abs() > 1e-10
-                || (c1.p1.y - c2.p1.y).abs() > 1e-10
-                || (c1.p2.x - c2.p2.x).abs() > 1e-10
-                || (c1.p2.y - c2.p2.y).abs() > 1e-10
-        });
+        // Jitter shifts the knob center along the edge (x-axis).
+        // The knob top (segment 2, index 2) midpoint x should differ.
+        let mid_x_1 = (curves1[2].p0.x + curves1[2].p3.x) / 2.0;
+        let mid_x_2 = (curves2[2].p0.x + curves2[2].p3.x) / 2.0;
         assert!(
-            any_diff,
-            "Different RNG states should produce different control points"
+            (mid_x_1 - mid_x_2).abs() > 1e-10,
+            "Different RNG seeds should shift knob center: {} vs {}",
+            mid_x_1,
+            mid_x_2
         );
+    }
+
+    #[test]
+    fn test_jitter_does_not_change_knob_shape() {
+        let connector = ClassicKnobConnector;
+        let params = default_params(TabDirection::Out);
+
+        let mut rng1 = create_rng("shape-a");
+        let curves1 = connector.generate(&params, &mut rng1);
+
+        let mut rng2 = create_rng("shape-b");
+        let curves2 = connector.generate(&params, &mut rng2);
+
+        // Compute center of each knob from the top segment midpoint
+        let center1 = (curves1[2].p0.x + curves1[2].p3.x) / 2.0;
+        let center2 = (curves2[2].p0.x + curves2[2].p3.x) / 2.0;
+        let dx = center2 - center1;
+
+        // After shifting curves2 by -dx, all points should match
+        // (jitter only moves the knob, doesn't change its shape)
+        for (c1, c2) in curves1.iter().zip(curves2.iter()).skip(1).take(3) {
+            // Check segments 1-3 (the knob itself, not the approach segments)
+            assert!(
+                (c1.p0.y - c2.p0.y).abs() < 1e-10,
+                "y-coords should match (shape unchanged by jitter)"
+            );
+            assert!(
+                ((c1.p0.x + dx) - c2.p0.x).abs() < 1e-6,
+                "x-coords should match after center shift"
+            );
+        }
     }
 
     #[test]
