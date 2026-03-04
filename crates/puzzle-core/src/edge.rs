@@ -46,10 +46,13 @@ pub struct EdgeParams {
     pub length: f64,
     /// Tab direction (In or Out).
     pub direction: TabDirection,
-    /// Tab size as a fraction of edge length (0.15..=0.45).
+    /// Tab size as a fraction of edge length (0.15..=0.45, dynamically clamped).
     pub tab_size: f64,
     /// Jitter amount as a fraction (0.0..=1.0).
     pub jitter_amount: f64,
+    /// Neck-to-body width ratio derived from taper (0.5..=1.0).
+    /// 1.0 = no taper, 0.5 = maximum taper.
+    pub neck_ratio: f64,
 }
 
 #[cfg(test)]

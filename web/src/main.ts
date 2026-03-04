@@ -2,6 +2,7 @@ import init, {
   generate_svg,
   compute_pieces,
   init_panic_hook,
+  safe_tab_max,
 } from "puzzle-wasm";
 import "./style.css";
 
@@ -28,6 +29,7 @@ let widthInput: HTMLInputElement;
 let heightInput: HTMLInputElement;
 let unitSelect: HTMLSelectElement;
 let tabSlider: HTMLInputElement;
+let taperSlider: HTMLInputElement;
 let jitterSlider: HTMLInputElement;
 let radiusSlider: HTMLInputElement;
 let kerfSlider: HTMLInputElement;
@@ -37,6 +39,7 @@ let pieceCount: HTMLElement;
 let errorDisplay: HTMLElement;
 
 let tabReadout: HTMLElement;
+let taperReadout: HTMLElement;
 let jitterReadout: HTMLElement;
 let radiusReadout: HTMLElement;
 let kerfReadout: HTMLElement;
@@ -50,7 +53,7 @@ function buildConfig(): object {
     width: parseFloat(widthInput.value),
     height: parseFloat(heightInput.value),
     unit: unitSelect.value,
-    tab: { size_pct: parseFloat(tabSlider.value) },
+    tab: { size_pct: parseFloat(tabSlider.value), taper: parseFloat(taperSlider.value) },
     jitter: { amount: parseFloat(jitterSlider.value) },
     border: { corner_radius: parseFloat(radiusSlider.value) },
     seed: seedInput.value,
@@ -73,6 +76,7 @@ function loadFromURL(): boolean {
   const tab = parseInt(params.get("tab") ?? "25", 10) / 100;
   const jitter = parseInt(params.get("jitter") ?? "50", 10) / 100;
   const radius = parseFloat(params.get("radius") ?? "2");
+  const taper = parseInt(params.get("taper") ?? "50", 10) / 100; // 50 → 0.5
   const kerf = parseFloat(params.get("kerf") ?? "0");
   const seed = params.get("seed") ?? "";
 
@@ -82,6 +86,7 @@ function loadFromURL(): boolean {
   heightInput.value = String(h);
   unitSelect.value = unit;
   tabSlider.value = String(tab);
+  taperSlider.value = String(taper);
   jitterSlider.value = String(jitter);
   radiusSlider.value = String(radius);
   kerfSlider.value = String(kerf);
@@ -92,7 +97,7 @@ function loadFromURL(): boolean {
 
 function updateURL(): void {
   const config = buildConfig() as Record<string, unknown>;
-  const tabObj = config.tab as { size_pct: number };
+  const tabObj = config.tab as { size_pct: number; taper: number };
   const jitterObj = config.jitter as { amount: number };
   const borderObj = config.border as { corner_radius: number };
   const params = new URLSearchParams();
@@ -102,11 +107,32 @@ function updateURL(): void {
   params.set("h", String(config.height));
   params.set("unit", config.unit === "Inches" ? "in" : "mm");
   params.set("tab", String(Math.round(tabObj.size_pct * 100)));
+  params.set("taper", String(Math.round(tabObj.taper * 100)));
   params.set("jitter", String(Math.round(jitterObj.amount * 100)));
   params.set("radius", String(borderObj.corner_radius));
   params.set("kerf", String(config.kerf_width));
   params.set("seed", String(config.seed));
   history.replaceState(null, "", "?" + params.toString());
+}
+
+// ─── Dynamic Tab Size Clamping ───────────────────────────────
+
+function updateTabMax(): void {
+  const config = buildConfig();
+  const configJson = JSON.stringify(config);
+  try {
+    const result = JSON.parse(safe_tab_max(configJson));
+    if (result.max) {
+      const max = Math.round(result.max * 100) / 100; // round to 2 decimals
+      tabSlider.max = String(max);
+      // Clamp current value if it exceeds new max
+      if (parseFloat(tabSlider.value) > max) {
+        tabSlider.value = String(max);
+      }
+    }
+  } catch {
+    // Fallback: keep current max
+  }
 }
 
 // ─── SVG Generation ─────────────────────────────────────────
@@ -151,6 +177,7 @@ function generatePuzzle(): void {
 
 function updateReadouts(): void {
   tabReadout.textContent = `${Math.round(parseFloat(tabSlider.value) * 100)}%`;
+  taperReadout.textContent = parseFloat(taperSlider.value).toFixed(2);
   jitterReadout.textContent = parseFloat(jitterSlider.value).toFixed(2);
   radiusReadout.textContent = parseFloat(radiusSlider.value).toFixed(1);
   kerfReadout.textContent = parseFloat(kerfSlider.value).toFixed(2);
@@ -181,6 +208,7 @@ async function main(): Promise<void> {
   heightInput = document.getElementById("height") as HTMLInputElement;
   unitSelect = document.getElementById("unit") as HTMLSelectElement;
   tabSlider = document.getElementById("tab") as HTMLInputElement;
+  taperSlider = document.getElementById("taper") as HTMLInputElement;
   jitterSlider = document.getElementById("jitter") as HTMLInputElement;
   radiusSlider = document.getElementById("radius") as HTMLInputElement;
   kerfSlider = document.getElementById("kerf") as HTMLInputElement;
@@ -190,6 +218,7 @@ async function main(): Promise<void> {
   errorDisplay = document.getElementById("error-display")!;
 
   tabReadout = document.getElementById("tab-readout")!;
+  taperReadout = document.getElementById("taper-readout")!;
   jitterReadout = document.getElementById("jitter-readout")!;
   radiusReadout = document.getElementById("radius-readout")!;
   kerfReadout = document.getElementById("kerf-readout")!;
@@ -200,19 +229,24 @@ async function main(): Promise<void> {
     seedInput.value = randomSeed();
   }
 
-  // Initialize slider readouts from current values
+  // Compute initial safe tab max and update slider readouts
+  updateTabMax();
   updateReadouts();
 
   // ─── Event Wiring ───────────────────────────────────────
 
-  // Number inputs — instant regeneration
+  // Number inputs — instant regeneration + recalculate tab max
   const numberInputs = [rowsInput, colsInput, widthInput, heightInput];
   for (const input of numberInputs) {
-    input.addEventListener("input", generatePuzzle);
+    input.addEventListener("input", () => {
+      updateTabMax();
+      updateReadouts();
+      generatePuzzle();
+    });
   }
 
   // Range sliders — update readout + regenerate
-  const sliders = [tabSlider, jitterSlider, radiusSlider, kerfSlider];
+  const sliders = [tabSlider, taperSlider, jitterSlider, radiusSlider, kerfSlider];
   for (const slider of sliders) {
     slider.addEventListener("input", () => {
       updateReadouts();
@@ -220,8 +254,11 @@ async function main(): Promise<void> {
     });
   }
 
-  // Unit select
-  unitSelect.addEventListener("change", generatePuzzle);
+  // Unit select — also recalculate tab max (mm vs inches changes cell dimensions)
+  unitSelect.addEventListener("change", () => {
+    updateTabMax();
+    generatePuzzle();
+  });
 
   // Seed text input
   seedInput.addEventListener("input", generatePuzzle);

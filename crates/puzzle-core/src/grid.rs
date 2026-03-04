@@ -131,10 +131,48 @@ impl PuzzleGrid {
         }
     }
 
+    /// Compute the safe maximum tab size based on grid dimensions.
+    ///
+    /// Prevents opposing tabs from overlapping by ensuring:
+    /// - H-edge tabs don't exceed cell height (protrude vertically)
+    /// - V-edge tabs don't exceed cell width (protrude horizontally)
+    /// - Approach span doesn't exceed edge length
+    ///
+    /// Returns the clamped max with a 90% safety margin.
+    pub fn safe_tab_max(&self) -> f64 {
+        let rows = self.config.rows as f64;
+        let cols = self.config.cols as f64;
+        let cell_w = self.config.width / cols;
+        let cell_h = self.config.height / rows;
+
+        // Knob height ratio used in connector generation
+        const KNOB_HEIGHT_RATIO: f64 = 1.2;
+        const APPROACH_RATIO: f64 = 1.2;
+
+        // Constraint 1: H-edge tabs protrude into cell_h
+        // 2 * cell_w * pct * KNOB_HEIGHT_RATIO < cell_h
+        let max_h = cell_h / (2.0 * cell_w * KNOB_HEIGHT_RATIO);
+
+        // Constraint 2: V-edge tabs protrude into cell_w
+        // 2 * cell_h * pct * KNOB_HEIGHT_RATIO < cell_w
+        let max_v = cell_w / (2.0 * cell_h * KNOB_HEIGHT_RATIO);
+
+        // Constraint 3: Approach span must fit within edge
+        // 2 * pct * APPROACH_RATIO < 1
+        let max_approach = 1.0 / (2.0 * APPROACH_RATIO);
+
+        let theoretical_max = max_h.min(max_v).min(max_approach);
+
+        // Apply 90% safety margin, floor at 0.15 (minimum valid)
+        (theoretical_max * 0.9).max(0.15).min(0.45)
+    }
+
     /// Populate connector geometry on all internal edges.
     ///
     /// Uses the given `ConnectorGenerator` to produce bezier curves for each
     /// internal edge. Border edges remain `connector: None`.
+    ///
+    /// Tab size is dynamically clamped to `safe_tab_max()` to prevent overlap.
     ///
     /// RNG iteration order matches grid construction: h_edges row-major,
     /// then v_edges row-major. A fresh RNG is created from the config seed
@@ -145,6 +183,11 @@ impl PuzzleGrid {
         // Create a separate RNG for connector generation (deterministic, independent of grid RNG)
         let mut rng = create_rng(&format!("{}-connectors", self.config.seed));
 
+        // Clamp tab size to safe maximum for this grid's dimensions
+        let safe_max = self.safe_tab_max();
+        let effective_tab_size = self.config.tab.size_pct.min(safe_max);
+        let neck_ratio = self.config.tab.neck_ratio();
+
         // Generate connectors for horizontal edges
         for edge in &mut self.h_edges {
             if edge.is_border {
@@ -153,8 +196,9 @@ impl PuzzleGrid {
             let params = EdgeParams {
                 length: edge.length(),
                 direction: edge.direction,
-                tab_size: self.config.tab.size_pct,
+                tab_size: effective_tab_size,
                 jitter_amount: self.config.jitter.amount,
+                neck_ratio,
             };
             let curves = connector.generate(&params, &mut rng);
             edge.connector = Some(curves);
@@ -168,8 +212,9 @@ impl PuzzleGrid {
             let params = EdgeParams {
                 length: edge.length(),
                 direction: edge.direction,
-                tab_size: self.config.tab.size_pct,
+                tab_size: effective_tab_size,
                 jitter_amount: self.config.jitter.amount,
+                neck_ratio,
             };
             let curves = connector.generate(&params, &mut rng);
             edge.connector = Some(curves);

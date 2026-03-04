@@ -56,6 +56,7 @@ mod tests {
             direction: TabDirection::Out,
             tab_size: 0.25,
             jitter_amount: 0.5,
+            neck_ratio: 0.75,
         };
         let mut rng = create_rng("test");
         let curves = connector.generate(&params, &mut rng);
@@ -70,6 +71,7 @@ mod tests {
             direction: TabDirection::In,
             tab_size: 0.25,
             jitter_amount: 0.5,
+            neck_ratio: 0.75,
         };
         let result = connector.validate(&[], &params);
         assert!(result.is_ok());
@@ -84,6 +86,7 @@ mod tests {
             direction: TabDirection::Out,
             tab_size: 0.30,
             jitter_amount: 0.0,
+            neck_ratio: 0.75,
         };
         let mut rng = create_rng("trait-test");
         let curves = connector.generate(&params, &mut rng);

@@ -8,8 +8,8 @@ use crate::edge::{EdgeParams, TabDirection};
 /// Ratio of knob height to knob width (height = width * this).
 const KNOB_HEIGHT_RATIO: f64 = 1.2;
 
-/// Neck width as a fraction of knob width (narrower than body for snap-fit).
-const NECK_WIDTH_RATIO: f64 = 0.75;
+// Neck width ratio is now dynamic via params.neck_ratio (from TabConfig.taper).
+// taper=0.0 → neck_ratio=1.0, taper=0.5 → 0.75 (classic), taper=1.0 → 0.5.
 
 /// Neck height as a fraction of knob height (how tall the neck is before widening).
 const NECK_HEIGHT_RATIO: f64 = 0.35;
@@ -83,7 +83,7 @@ impl ConnectorGenerator for ClassicKnobConnector {
         // Knob dimensions
         let knob_w = length * params.tab_size;
         let knob_h = knob_w * KNOB_HEIGHT_RATIO * dir_sign;
-        let neck_w = knob_w * NECK_WIDTH_RATIO;
+        let neck_w = knob_w * params.neck_ratio;
         let neck_h = knob_h * NECK_HEIGHT_RATIO;
 
         // Control point jitter values (4 independent perturbations)
@@ -211,6 +211,7 @@ mod tests {
             direction,
             tab_size: 0.25,
             jitter_amount: 0.5,
+            neck_ratio: 0.75,
         }
     }
 
@@ -359,6 +360,7 @@ mod tests {
             direction: TabDirection::Out,
             tab_size: 0.25,
             jitter_amount: 0.0,
+            neck_ratio: 0.75,
         };
 
         let mut rng = create_rng("zero-jitter");
@@ -389,6 +391,7 @@ mod tests {
             direction: TabDirection::Out,
             tab_size: 0.15,
             jitter_amount: 0.0,
+            neck_ratio: 0.75,
         };
 
         let large_params = EdgeParams {
@@ -396,6 +399,7 @@ mod tests {
             direction: TabDirection::Out,
             tab_size: 0.45,
             jitter_amount: 0.0,
+            neck_ratio: 0.75,
         };
 
         let mut rng1 = create_rng("size-test");
@@ -450,6 +454,7 @@ mod tests {
             direction: TabDirection::Out,
             tab_size: 0.25,
             jitter_amount: 0.0,
+            neck_ratio: 0.75,
         };
         let mut rng = create_rng("neck-test");
         let curves = connector.generate(&params, &mut rng);

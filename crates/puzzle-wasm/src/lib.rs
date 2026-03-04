@@ -241,6 +241,27 @@ pub fn generate_svg(config_json: &str) -> String {
     puzzle_core::generate_svg(&grid)
 }
 
+/// Compute the safe maximum tab size for a given grid configuration.
+///
+/// Accepts JSON: `{"rows": N, "cols": M, "width": W, "height": H}`
+/// Returns JSON: `{"max": 0.35}` (the safe maximum tab size_pct)
+/// Or on error: `{"error": "message"}`
+#[wasm_bindgen]
+pub fn safe_tab_max(config_json: &str) -> String {
+    let config: PuzzleConfig = match serde_json::from_str(config_json) {
+        Ok(c) => c,
+        Err(e) => return format!(r#"{{"error":"Invalid JSON: {}"}}"#, e),
+    };
+
+    let grid = match PuzzleGrid::new(config) {
+        Ok(g) => g,
+        Err(e) => return format!(r#"{{"error":"{}"}}"#, e),
+    };
+
+    let max = grid.safe_tab_max();
+    format!(r#"{{"max":{:.4}}}"#, max)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

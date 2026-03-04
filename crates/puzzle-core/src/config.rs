@@ -32,17 +32,31 @@ impl Unit {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TabConfig {
     /// Tab size as a fraction of edge length (0.15..=0.45, default 0.25).
+    /// The effective maximum is dynamically clamped based on grid dimensions
+    /// to prevent opposing tabs from overlapping.
     pub size_pct: f64,
+    /// Taper amount controlling the neck-to-body ratio (0.0..=1.0, default 0.5).
+    /// 0.0 = no taper (cylindrical tab), 0.5 = moderate snap-fit (current classic),
+    /// 1.0 = aggressive taper (narrow neck, wide body).
+    #[serde(default = "default_taper")]
+    pub taper: f64,
+}
+
+fn default_taper() -> f64 {
+    0.5
 }
 
 impl Default for TabConfig {
     fn default() -> Self {
-        Self { size_pct: 0.25 }
+        Self {
+            size_pct: 0.25,
+            taper: 0.5,
+        }
     }
 }
 
 impl TabConfig {
-    /// Validate that tab size is within acceptable bounds.
+    /// Validate that tab parameters are within acceptable bounds.
     pub fn validate(&self) -> Result<(), String> {
         if self.size_pct < 0.15 || self.size_pct > 0.45 {
             return Err(format!(
@@ -50,7 +64,19 @@ impl TabConfig {
                 self.size_pct
             ));
         }
+        if self.taper < 0.0 || self.taper > 1.0 {
+            return Err(format!(
+                "tab taper must be between 0.0 and 1.0, got {}",
+                self.taper
+            ));
+        }
         Ok(())
+    }
+
+    /// Compute the neck-to-body width ratio from the taper value.
+    /// taper=0.0 → ratio=1.0 (no narrowing), taper=1.0 → ratio=0.5 (aggressive).
+    pub fn neck_ratio(&self) -> f64 {
+        1.0 - self.taper * 0.5
     }
 }
 
@@ -404,7 +430,10 @@ mod tests {
             1.0,
             1.0,
             Unit::Millimeters,
-            TabConfig { size_pct: 0.15 },
+            TabConfig {
+                size_pct: 0.15,
+                taper: 0.5,
+            },
             JitterConfig { amount: 0.0 },
             BorderConfig { corner_radius: 0.0 },
             String::new(),
@@ -419,7 +448,10 @@ mod tests {
             1000.0,
             1000.0,
             Unit::Millimeters,
-            TabConfig { size_pct: 0.45 },
+            TabConfig {
+                size_pct: 0.45,
+                taper: 1.0,
+            },
             JitterConfig { amount: 1.0 },
             BorderConfig {
                 corner_radius: 10.0,
