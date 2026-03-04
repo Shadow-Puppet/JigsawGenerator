@@ -47,6 +47,27 @@ let tabMaxSlider: HTMLInputElement;
 let taperRandomize: HTMLInputElement;
 let taperMaxSlider: HTMLInputElement;
 
+let rulerWidth: HTMLElement;
+let rulerHeight: HTMLElement;
+let svgViewport: HTMLElement;
+let zoomLevelDisplay: HTMLElement;
+let zoomInBtn: HTMLElement;
+let zoomOutBtn: HTMLElement;
+let zoomResetBtn: HTMLElement;
+
+// ─── Zoom/Pan State ──────────────────────────────────────────
+
+let zoomLevel = 1;
+let panX = 0;
+let panY = 0;
+let isPanning = false;
+let panStartX = 0;
+let panStartY = 0;
+
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 20;
+const ZOOM_STEP = 1.15; // 15% per wheel tick
+
 // ─── Config Builder ─────────────────────────────────────────
 
 function buildConfig(): object {
@@ -170,6 +191,31 @@ function updateTabMax(): void {
   }
 }
 
+// ─── Ruler Update ───────────────────────────────────────────
+
+function updateRuler(): void {
+  const w = parseFloat(widthInput.value);
+  const h = parseFloat(heightInput.value);
+  const unit = unitSelect.value === "Inches" ? "in" : "mm";
+  const fmt = unit === "mm" ? 0 : 2;
+  rulerWidth.textContent = `${w.toFixed(fmt)} ${unit}`;
+  rulerHeight.textContent = `${h.toFixed(fmt)} ${unit}`;
+}
+
+// ─── Zoom/Pan Helpers ───────────────────────────────────────
+
+function applyTransform(): void {
+  svgContainer.style.transform = `translate(${panX}px, ${panY}px) scale(${zoomLevel})`;
+  zoomLevelDisplay.textContent = `${Math.round(zoomLevel * 100)}%`;
+}
+
+function resetZoom(): void {
+  zoomLevel = 1;
+  panX = 0;
+  panY = 0;
+  applyTransform();
+}
+
 // ─── SVG Generation ─────────────────────────────────────────
 
 function generatePuzzle(): void {
@@ -180,6 +226,24 @@ function generatePuzzle(): void {
   const svgResult = generate_svg(configJson);
   if (svgResult.startsWith("<svg")) {
     svgContainer.innerHTML = svgResult;
+
+    // Normalize SVG: remove fixed width/height, ensure viewBox fills container
+    const svgEl = svgContainer.querySelector("svg");
+    if (svgEl) {
+      const wAttr = svgEl.getAttribute("width");
+      const hAttr = svgEl.getAttribute("height");
+      // If no viewBox, create one from width/height before removing them
+      if (!svgEl.getAttribute("viewBox") && wAttr && hAttr) {
+        const numW = parseFloat(wAttr);
+        const numH = parseFloat(hAttr);
+        if (!isNaN(numW) && !isNaN(numH)) {
+          svgEl.setAttribute("viewBox", `0 0 ${numW} ${numH}`);
+        }
+      }
+      svgEl.removeAttribute("width");
+      svgEl.removeAttribute("height");
+    }
+
     errorDisplay.style.display = "none";
 
     // Also get piece breakdown
@@ -206,6 +270,10 @@ function generatePuzzle(): void {
 
   // Update URL with current params (replaceState — no history spam)
   updateURL();
+
+  // Update ruler and reset zoom on each generation
+  updateRuler();
+  resetZoom();
 }
 
 // ─── Readout Updaters ───────────────────────────────────────
@@ -322,6 +390,14 @@ async function main(): Promise<void> {
   tabMaxSlider = document.getElementById("tab-max") as HTMLInputElement;
   taperRandomize = document.getElementById("taper-randomize") as HTMLInputElement;
   taperMaxSlider = document.getElementById("taper-max") as HTMLInputElement;
+
+  rulerWidth = document.getElementById("ruler-width")!;
+  rulerHeight = document.getElementById("ruler-height")!;
+  svgViewport = document.getElementById("svg-viewport")!;
+  zoomLevelDisplay = document.getElementById("zoom-level")!;
+  zoomInBtn = document.getElementById("zoom-in")!;
+  zoomOutBtn = document.getElementById("zoom-out")!;
+  zoomResetBtn = document.getElementById("zoom-reset")!;
 
   // Load params from URL (if any), otherwise generate random seed
   const hasUrlParams = loadFromURL();

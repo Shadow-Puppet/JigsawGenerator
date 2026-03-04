@@ -108,8 +108,23 @@
         </aside>
 
         <main class="preview-area">
-          <div id="svg-container"></div>
-          <p id="piece-count"></p>
+          <div id="dimension-ruler">
+            <span id="ruler-width" class="ruler-label"></span>
+            <span class="ruler-x">&times;</span>
+            <span id="ruler-height" class="ruler-label"></span>
+          </div>
+          <div id="svg-viewport">
+            <div id="svg-container"></div>
+          </div>
+          <div class="preview-footer">
+            <p id="piece-count"></p>
+            <div id="zoom-controls">
+              <button type="button" id="zoom-in" title="Zoom in">+</button>
+              <span id="zoom-level">100%</span>
+              <button type="button" id="zoom-out" title="Zoom out">&minus;</button>
+              <button type="button" id="zoom-reset" title="Fit to width">&#8865;</button>
+            </div>
+          </div>
           <p id="error-display"></p>
         </main>
       </div>
