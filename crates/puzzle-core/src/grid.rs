@@ -256,7 +256,6 @@ mod tests {
             tab: TabConfig::default(),
             border: BorderConfig::default(),
             seed: seed.to_string(),
-            kerf_width: 0.0,
         }
     }
 

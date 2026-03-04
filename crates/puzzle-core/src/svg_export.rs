@@ -3,7 +3,6 @@ use std::f64::consts::PI;
 use kurbo::{Affine, Arc, BezPath, PathEl, Point, Vec2};
 
 use crate::grid::PuzzleGrid;
-use crate::kerf::offset_path;
 
 /// Generate a complete SVG document from a populated PuzzleGrid.
 ///
@@ -17,14 +16,9 @@ use crate::kerf::offset_path;
 /// - Absolute coordinates only (M, L, C, Z)
 /// - Border as a closed subpath with rounded corners
 /// - Internal edges as open subpaths with connector curves
-/// - Optional kerf compensation when `config.kerf_width > 0`
 pub fn generate_svg(grid: &PuzzleGrid) -> String {
-    let mut border = build_border_path(grid);
+    let border = build_border_path(grid);
     let connectors = build_connector_paths(grid);
-
-    if grid.config.kerf_width > 0.0 {
-        border = offset_path(&border, grid.config.kerf_width);
-    }
 
     // Combine: border first, then connectors
     let mut combined = border;
@@ -247,7 +241,6 @@ mod tests {
             tab: TabConfig::default(),
             border: BorderConfig::default(),
             seed: seed.to_string(),
-            kerf_width: 0.0,
         }
     }
 
@@ -405,56 +398,5 @@ mod tests {
         // For a vertical downward edge, angle = PI/2
         let p = t * Point::new(0.0, 0.0);
         assert!((p.x - 0.0).abs() < 1e-6 && (p.y - 50.0).abs() < 1e-6);
-    }
-
-    #[test]
-    fn test_kerf_only_offsets_border() {
-        let mut config_no_kerf = test_config(3, 4, "kerf-test");
-        config_no_kerf.kerf_width = 0.0;
-        let mut grid_no_kerf = PuzzleGrid::new(config_no_kerf).unwrap();
-        grid_no_kerf.generate_connectors(&ClassicKnobConnector);
-        let svg_no_kerf = generate_svg(&grid_no_kerf);
-
-        let mut config_kerf = test_config(3, 4, "kerf-test");
-        config_kerf.kerf_width = 0.2;
-        let mut grid_kerf = PuzzleGrid::new(config_kerf).unwrap();
-        grid_kerf.generate_connectors(&ClassicKnobConnector);
-        let svg_kerf = generate_svg(&grid_kerf);
-
-        // SVGs should differ (border is offset)
-        assert_ne!(svg_no_kerf, svg_kerf, "kerf should change the SVG output");
-
-        // Extract path data from both
-        let extract_path = |svg: &str| -> String {
-            let start = svg.find("d='").unwrap() + 3;
-            let end = svg[start..].find('\'').unwrap() + start;
-            svg[start..end].to_string()
-        };
-
-        let path_no_kerf = extract_path(&svg_no_kerf);
-        let path_kerf = extract_path(&svg_kerf);
-
-        // Count M commands — should be same count (same structure)
-        let m_count_no_kerf = path_no_kerf.matches('M').count();
-        let m_count_kerf = path_kerf.matches('M').count();
-        assert_eq!(
-            m_count_no_kerf, m_count_kerf,
-            "kerf should not change number of subpaths"
-        );
-
-        // Internal connector curves (C commands after the first Z which ends the border)
-        // should be identical between kerf and no-kerf
-        let connectors_no_kerf = path_no_kerf
-            .find('Z')
-            .map(|z| &path_no_kerf[z + 1..])
-            .unwrap_or("");
-        let connectors_kerf = path_kerf
-            .find('Z')
-            .map(|z| &path_kerf[z + 1..])
-            .unwrap_or("");
-        assert_eq!(
-            connectors_no_kerf, connectors_kerf,
-            "kerf should not modify internal connector paths"
-        );
     }
 }
