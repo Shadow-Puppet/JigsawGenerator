@@ -167,6 +167,93 @@ input[type="range"] {
   cursor: pointer;
 }
 
+/* ─── Randomize Toggle ─────────────────────────────────────── */
+
+.randomize-toggle {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: #999;
+  gap: 0.15rem;
+}
+
+.randomize-toggle input[type="checkbox"] {
+  display: none;
+}
+
+.randomize-toggle input[type="checkbox"]:checked + .toggle-icon {
+  color: #4a90d9;
+}
+
+.toggle-icon {
+  font-size: 1rem;
+  transition: color 0.15s;
+}
+
+/* ─── Dual Range Slider ────────────────────────────────────── */
+
+.range-slider-container {
+  position: relative;
+  height: 1.5rem;
+}
+
+.range-slider-container input[type="range"] {
+  position: absolute;
+  width: 100%;
+  top: 0;
+  pointer-events: none;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+}
+
+.range-slider-container input[type="range"]::-webkit-slider-thumb {
+  pointer-events: all;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 16px;
+  width: 16px;
+  border-radius: 50%;
+  background: #4a90d9;
+  cursor: pointer;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.range-slider-container input[type="range"]::-moz-range-thumb {
+  pointer-events: all;
+  height: 16px;
+  width: 16px;
+  border-radius: 50%;
+  background: #4a90d9;
+  cursor: pointer;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+/* Ensure only the first (min) range shows the track */
+.range-slider-container input[type="range"].range-max::-webkit-slider-runnable-track {
+  background: transparent;
+}
+
+.range-slider-container input[type="range"].range-max::-moz-range-track {
+  background: transparent;
+}
+
+/* Style the track for the min slider */
+.range-slider-container input[type="range"]:first-child::-webkit-slider-runnable-track {
+  height: 4px;
+  background: #ddd;
+  border-radius: 2px;
+}
+
+.range-slider-container input[type="range"]:first-child::-moz-range-track {
+  height: 4px;
+  background: #ddd;
+  border-radius: 2px;
+}
+
 /* ─── Seed ─────────────────────────────────────────────────── */
 
 .seed-row {

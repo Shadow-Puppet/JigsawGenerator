@@ -42,16 +42,31 @@ let taperReadout: HTMLElement;
 let radiusReadout: HTMLElement;
 let kerfReadout: HTMLElement;
 
+let tabRandomize: HTMLInputElement;
+let tabMaxSlider: HTMLInputElement;
+let taperRandomize: HTMLInputElement;
+let taperMaxSlider: HTMLInputElement;
+
 // ─── Config Builder ─────────────────────────────────────────
 
 function buildConfig(): object {
+  const tabConfig: Record<string, unknown> = {
+    size_pct: parseFloat(tabSlider.value),
+    taper: 0.5 + parseFloat(taperSlider.value) * 0.7,
+  };
+  if (tabRandomize.checked) {
+    tabConfig.size_pct_max = parseFloat(tabMaxSlider.value);
+  }
+  if (taperRandomize.checked) {
+    tabConfig.taper_max = 0.5 + parseFloat(taperMaxSlider.value) * 0.7;
+  }
   return {
     rows: parseInt(rowsInput.value, 10),
     cols: parseInt(colsInput.value, 10),
     width: parseFloat(widthInput.value),
     height: parseFloat(heightInput.value),
     unit: unitSelect.value,
-    tab: { size_pct: parseFloat(tabSlider.value), taper: 0.5 + parseFloat(taperSlider.value) * 0.7 },
+    tab: tabConfig,
     border: { corner_radius: parseFloat(radiusSlider.value) },
     seed: seedInput.value,
     kerf_width: parseFloat(kerfSlider.value),
@@ -88,12 +103,26 @@ function loadFromURL(): boolean {
   kerfSlider.value = String(kerf);
   seedInput.value = seed || randomSeed();
 
+  // Restore randomize state
+  if (params.get("tabr") === "1") {
+    tabRandomize.checked = true;
+    const tabMax = Math.max(0.15, Math.min(0.25, parseInt(params.get("tabmax") ?? "25", 10) / 100));
+    tabMaxSlider.value = String(tabMax);
+    tabMaxSlider.style.display = "";
+  }
+  if (params.get("taperr") === "1") {
+    taperRandomize.checked = true;
+    const taperMax = Math.max(0, Math.min(1, parseInt(params.get("tapermax") ?? "0", 10) / 100));
+    taperMaxSlider.value = String(taperMax);
+    taperMaxSlider.style.display = "";
+  }
+
   return true;
 }
 
 function updateURL(): void {
   const config = buildConfig() as Record<string, unknown>;
-  const tabObj = config.tab as { size_pct: number; taper: number };
+  const tabObj = config.tab as Record<string, number>;
   const borderObj = config.border as { corner_radius: number };
   const params = new URLSearchParams();
   params.set("rows", String(config.rows));
@@ -106,6 +135,14 @@ function updateURL(): void {
   params.set("radius", String(borderObj.corner_radius));
   params.set("kerf", String(config.kerf_width));
   params.set("seed", String(config.seed));
+  if (tabRandomize.checked) {
+    params.set("tabr", "1");
+    params.set("tabmax", String(Math.round(parseFloat(tabMaxSlider.value) * 100)));
+  }
+  if (taperRandomize.checked) {
+    params.set("taperr", "1");
+    params.set("tapermax", String(Math.round(parseFloat(taperMaxSlider.value) * 100)));
+  }
   history.replaceState(null, "", "?" + params.toString());
 }
 
@@ -119,9 +156,13 @@ function updateTabMax(): void {
     if (result.max) {
       const max = Math.round(result.max * 100) / 100; // round to 2 decimals
       tabSlider.max = String(max);
+      tabMaxSlider.max = String(max);
       // Clamp current value if it exceeds new max
       if (parseFloat(tabSlider.value) > max) {
         tabSlider.value = String(max);
+      }
+      if (parseFloat(tabMaxSlider.value) > max) {
+        tabMaxSlider.value = String(max);
       }
     }
   } catch {
@@ -170,10 +211,58 @@ function generatePuzzle(): void {
 // ─── Readout Updaters ───────────────────────────────────────
 
 function updateReadouts(): void {
-  tabReadout.textContent = `${Math.round(parseFloat(tabSlider.value) * 100)}%`;
-  taperReadout.textContent = parseFloat(taperSlider.value).toFixed(2);
+  if (tabRandomize.checked) {
+    const minPct = Math.round(parseFloat(tabSlider.value) * 100);
+    const maxPct = Math.round(parseFloat(tabMaxSlider.value) * 100);
+    tabReadout.textContent = `${minPct}%-${maxPct}%`;
+  } else {
+    tabReadout.textContent = `${Math.round(parseFloat(tabSlider.value) * 100)}%`;
+  }
+  if (taperRandomize.checked) {
+    taperReadout.textContent = `${parseFloat(taperSlider.value).toFixed(2)}-${parseFloat(taperMaxSlider.value).toFixed(2)}`;
+  } else {
+    taperReadout.textContent = parseFloat(taperSlider.value).toFixed(2);
+  }
   radiusReadout.textContent = parseFloat(radiusSlider.value).toFixed(1);
   kerfReadout.textContent = parseFloat(kerfSlider.value).toFixed(2);
+}
+
+// ─── Randomize Toggle Helpers ────────────────────────────────
+
+function toggleRandomize(
+  checkbox: HTMLInputElement,
+  maxSlider: HTMLInputElement,
+  minSlider: HTMLInputElement
+): void {
+  if (checkbox.checked) {
+    maxSlider.style.display = "";
+    // Ensure max >= min
+    if (parseFloat(maxSlider.value) < parseFloat(minSlider.value)) {
+      maxSlider.value = minSlider.value;
+    }
+  } else {
+    maxSlider.style.display = "none";
+  }
+  updateReadouts();
+  generatePuzzle();
+}
+
+function clampMinMax(
+  minSlider: HTMLInputElement,
+  maxSlider: HTMLInputElement
+): void {
+  if (parseFloat(maxSlider.value) < parseFloat(minSlider.value)) {
+    maxSlider.value = minSlider.value;
+  }
+}
+
+function clampMaxMin(
+  minSlider: HTMLInputElement,
+  maxSlider: HTMLInputElement
+): void {
+  if (parseFloat(minSlider.value) > parseFloat(maxSlider.value)) {
+    minSlider.value = maxSlider.value;
+  }
 }
 
 // ─── Main ───────────────────────────────────────────────────
@@ -214,6 +303,11 @@ async function main(): Promise<void> {
   radiusReadout = document.getElementById("radius-readout")!;
   kerfReadout = document.getElementById("kerf-readout")!;
 
+  tabRandomize = document.getElementById("tab-randomize") as HTMLInputElement;
+  tabMaxSlider = document.getElementById("tab-max") as HTMLInputElement;
+  taperRandomize = document.getElementById("taper-randomize") as HTMLInputElement;
+  taperMaxSlider = document.getElementById("taper-max") as HTMLInputElement;
+
   // Load params from URL (if any), otherwise generate random seed
   const hasUrlParams = loadFromURL();
   if (!hasUrlParams) {
@@ -240,10 +334,37 @@ async function main(): Promise<void> {
   const sliders = [tabSlider, taperSlider, radiusSlider, kerfSlider];
   for (const slider of sliders) {
     slider.addEventListener("input", () => {
+      // When randomize is on, clamp min <= max
+      if (slider === tabSlider && tabRandomize.checked) {
+        clampMinMax(tabSlider, tabMaxSlider);
+      }
+      if (slider === taperSlider && taperRandomize.checked) {
+        clampMinMax(taperSlider, taperMaxSlider);
+      }
       updateReadouts();
       generatePuzzle();
     });
   }
+
+  // Max sliders — clamp and regenerate
+  tabMaxSlider.addEventListener("input", () => {
+    clampMaxMin(tabSlider, tabMaxSlider);
+    updateReadouts();
+    generatePuzzle();
+  });
+  taperMaxSlider.addEventListener("input", () => {
+    clampMaxMin(taperSlider, taperMaxSlider);
+    updateReadouts();
+    generatePuzzle();
+  });
+
+  // Randomize checkboxes
+  tabRandomize.addEventListener("change", () => {
+    toggleRandomize(tabRandomize, tabMaxSlider, tabSlider);
+  });
+  taperRandomize.addEventListener("change", () => {
+    toggleRandomize(taperRandomize, taperMaxSlider, taperSlider);
+  });
 
   // Unit select — also recalculate tab max (mm vs inches changes cell dimensions)
   unitSelect.addEventListener("change", () => {
