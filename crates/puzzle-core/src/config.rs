@@ -35,9 +35,10 @@ pub struct TabConfig {
     /// The effective maximum is dynamically clamped based on grid dimensions
     /// to prevent opposing tabs from overlapping.
     pub size_pct: f64,
-    /// Taper amount controlling the neck-to-body ratio (0.30..=1.10, default 0.5).
-    /// 0.30 = mild taper, 0.5 = moderate snap-fit (current classic),
-    /// 1.10 = aggressive taper (narrow neck, wide body).
+    /// Taper amount controlling the neck-to-body ratio (0.50..=1.20, default 0.50).
+    /// 0.50 = mild taper, 0.85 = moderate snap-fit, 1.20 = aggressive taper
+    /// (narrow neck, wide body). Note: the UI presents this as a normalized 0-1
+    /// range; the WASM layer maps user 0→internal 0.5, user 1→internal 1.2.
     #[serde(default = "default_taper")]
     pub taper: f64,
 }
@@ -64,9 +65,9 @@ impl TabConfig {
                 self.size_pct
             ));
         }
-        if self.taper < 0.30 || self.taper > 1.10 {
+        if self.taper < 0.50 || self.taper > 1.20 {
             return Err(format!(
-                "tab taper must be between 0.30 and 1.10, got {}",
+                "tab taper must be between 0.50 and 1.20, got {}",
                 self.taper
             ));
         }
@@ -74,7 +75,7 @@ impl TabConfig {
     }
 
     /// Compute the neck-to-body width ratio from the taper value.
-    /// taper=0.0 → ratio=1.0 (no narrowing), taper=1.0 → ratio=0.5 (aggressive).
+    /// taper=0.50 → ratio=0.75 (mild), taper=0.85 → ratio=0.575, taper=1.20 → ratio=0.40 (aggressive).
     pub fn neck_ratio(&self) -> f64 {
         1.0 - self.taper * 0.5
     }
@@ -382,7 +383,7 @@ mod tests {
             Unit::Millimeters,
             TabConfig {
                 size_pct: 0.15,
-                taper: 0.30,
+                taper: 0.50,
             },
             BorderConfig { corner_radius: 0.0 },
             String::new(),
@@ -399,7 +400,7 @@ mod tests {
             Unit::Millimeters,
             TabConfig {
                 size_pct: 0.45,
-                taper: 1.10,
+                taper: 1.20,
             },
             BorderConfig {
                 corner_radius: 10.0,
@@ -418,7 +419,7 @@ mod tests {
             Unit::Millimeters,
             TabConfig {
                 size_pct: 0.45,
-                taper: 1.10,
+                taper: 1.20,
             },
             BorderConfig {
                 corner_radius: 10.0,
