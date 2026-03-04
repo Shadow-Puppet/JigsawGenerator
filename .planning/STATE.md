@@ -72,7 +72,7 @@ Phase 4 [x] Web GUI & Live Preview (2/2 plans)
 - 5 cubic bezier segments per knob: baseline→neck, neck→body, top, body→neck, neck→baseline
     - Neck width 75% of body width creates visible narrowing for snap-fit
 - Single <path> element for all cut lines — border closed subpath + internal edge open subpaths
-- Kerf compensation via polyline offset with miter/bevel joins (no re-smoothing for v1)
+- Kerf compensation removed entirely — broken feature deleted from codebase (quick-009)
 - kurbo::Arc for quarter-circle rounded corners → cubic bezier approximation
 - Affine transform (translate * rotate) for edge-local to global coordinate mapping
 - No debounce on parameter changes — WASM generate_svg fast enough for instant regeneration
@@ -82,7 +82,7 @@ Phase 4 [x] Web GUI & Live Preview (2/2 plans)
 - URL param abbreviations: w/h, mm/in, tab/jitter as integer percentages for compact shareable URLs
 - Taper range adjusted to 0.30..=1.10; old URL params clamped for backward compat (quick-001)
 - Taper slider normalized to 0-1 user-facing range with linear interpolation to internal 0.5-1.2 (quick-002)
-- Kerf offset applied to border path only; connectors pass through unchanged for correct laser-cut fit (quick-008)
+- Kerf feature removed entirely — offset algorithm never worked correctly (quick-009, supersedes quick-008)
 - Max tab size capped at 25% (was 45%) to prevent oversized/overlapping connectors (quick-003)
 - safe_tab_max() must clamp inputs before validation — otherwise out-of-range slider values cause validation failure, silently preventing max updates (quick-004)
 - Optional size_pct_max/taper_max fields with serde skip_serializing_if; randomize helpers consume zero RNG when None for backward compat (quick-005)
@@ -120,13 +120,14 @@ Phase 4 [x] Web GUI & Live Preview (2/2 plans)
 | 006 | Auto-convert width/height when unit dropdown changes | 2026-03-04 | c1a459d | [6-convert-dimension-values-automatically-w](./quick/6-convert-dimension-values-automatically-w/) |
 | 007 | SVG preview: fill container width, add ruler, enable zoom/pan | 2026-03-04 | 5ee5e4d | [7-svg-preview-fill-container-width-add-rul](./quick/7-svg-preview-fill-container-width-add-rul/) |
 | 008 | Fix kerf width setting - offset border only, not connectors | 2026-03-04 | b2d77de | [8-investigate-and-fix-kerf-width-setting-c](./quick/8-investigate-and-fix-kerf-width-setting-c/) |
+| 009 | Remove kerf width feature entirely | 2026-03-04 | efb9242 | [9-remove-kerf-width-feature-entirely-delet](./quick/9-remove-kerf-width-feature-entirely-delet/) |
 
 ## Session Continuity
 
-**Last session:** 2026-03-04T19:59:42Z
-**Stopped at:** Completed quick task 008: Fix kerf width to offset border only
-**Next action:** Milestone complete — all 4 phases done, quick-001 through 008 applied
+**Last session:** 2026-03-04T21:47:22Z
+**Stopped at:** Completed quick task 009: Remove kerf width feature entirely
+**Next action:** Milestone complete — all 4 phases done, quick-001 through 009 applied
 
 ---
-Last activity: 2026-03-04 - Completed quick task 008: Fix kerf width setting - border only offset
-*Last updated: 2026-03-04T19:59:42Z*
+Last activity: 2026-03-04 - Completed quick task 009: Remove kerf width feature entirely
+*Last updated: 2026-03-04T21:47:22Z*
