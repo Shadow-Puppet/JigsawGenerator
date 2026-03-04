@@ -85,6 +85,7 @@ Phase 4 [x] Web GUI & Live Preview (2/2 plans)
 - Max tab size capped at 25% (was 45%) to prevent oversized/overlapping connectors (quick-003)
 - safe_tab_max() must clamp inputs before validation — otherwise out-of-range slider values cause validation failure, silently preventing max updates (quick-004)
 - Optional size_pct_max/taper_max fields with serde skip_serializing_if; randomize helpers consume zero RNG when None for backward compat (quick-005)
+- convertDimensions() with factor 25.4 and parseFloat(toFixed(2)) for clean unit conversion display (quick-006)
 
 ### Research Flags
 - **Phase 3 (Connectors):** Complete. Connector generation + SVG export pipeline fully functional.
@@ -113,13 +114,14 @@ Phase 4 [x] Web GUI & Live Preview (2/2 plans)
 | 003 | Set the max tab size to 25% | 2026-03-04 | ec0f42a | [3-set-the-max-tab-size-to-25](./quick/3-set-the-max-tab-size-to-25/) |
 | 004 | Rebuild WASM and fix safe_tab_max validation chicken-and-egg bug | 2026-03-04 | 2e1ce8e | [4-rebuild-wasm-and-fix-safe-tab-max-valida](./quick/4-rebuild-wasm-and-fix-safe-tab-max-valida/) |
 | 005 | Add randomize-per-edge option to tab size and taper | 2026-03-04 | 2f589ef | [5-add-randomize-per-edge-option-to-tab-siz](./quick/5-add-randomize-per-edge-option-to-tab-siz/) |
+| 006 | Auto-convert width/height when unit dropdown changes | 2026-03-04 | c1a459d | [6-convert-dimension-values-automatically-w](./quick/6-convert-dimension-values-automatically-w/) |
 
 ## Session Continuity
 
-**Last session:** 2026-03-04T18:31:00Z
-**Stopped at:** Completed quick task 005: add randomize-per-edge option to tab size and taper
-**Next action:** Milestone complete — all 4 phases done, quick-001/002/003/004/005 applied
+**Last session:** 2026-03-04T19:00:00Z
+**Stopped at:** Completed quick task 006: auto-convert dimension values on unit change
+**Next action:** Milestone complete — all 4 phases done, quick-001 through 006 applied
 
 ---
-Last activity: 2026-03-04 - Completed quick task 005: Add randomize-per-edge option to tab size and taper
-*Last updated: 2026-03-04T18:31:00Z*
+Last activity: 2026-03-04 - Completed quick task 006: Auto-convert dimension values on unit change
+*Last updated: 2026-03-04T19:00:00Z*
