@@ -185,18 +185,18 @@ impl PuzzleGrid {
 
         // Clamp tab size to safe maximum for this grid's dimensions
         let safe_max = self.safe_tab_max();
-        let effective_tab_size = self.config.tab.size_pct.min(safe_max);
-        let neck_ratio = self.config.tab.neck_ratio();
 
         // Generate connectors for horizontal edges
         for edge in &mut self.h_edges {
             if edge.is_border {
                 continue;
             }
+            let tab_size = self.config.tab.randomize_tab_size(safe_max, &mut rng);
+            let neck_ratio = self.config.tab.randomize_neck_ratio(&mut rng);
             let params = EdgeParams {
                 length: edge.length(),
                 direction: edge.direction,
-                tab_size: effective_tab_size,
+                tab_size,
                 neck_ratio,
             };
             let curves = connector.generate(&params, &mut rng);
@@ -208,10 +208,12 @@ impl PuzzleGrid {
             if edge.is_border {
                 continue;
             }
+            let tab_size = self.config.tab.randomize_tab_size(safe_max, &mut rng);
+            let neck_ratio = self.config.tab.randomize_neck_ratio(&mut rng);
             let params = EdgeParams {
                 length: edge.length(),
                 direction: edge.direction,
-                tab_size: effective_tab_size,
+                tab_size,
                 neck_ratio,
             };
             let curves = connector.generate(&params, &mut rng);

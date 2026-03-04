@@ -260,6 +260,12 @@ pub fn safe_tab_max(config_json: &str) -> String {
     // the config — the whole point of this function is to *compute* the max.
     config.tab.size_pct = config.tab.size_pct.clamp(0.15, 0.25);
     config.tab.taper = config.tab.taper.clamp(0.50, 1.20);
+    if let Some(ref mut max) = config.tab.size_pct_max {
+        *max = max.clamp(0.15, 0.25);
+    }
+    if let Some(ref mut max) = config.tab.taper_max {
+        *max = max.clamp(0.50, 1.20);
+    }
 
     let grid = match PuzzleGrid::new(config) {
         Ok(g) => g,

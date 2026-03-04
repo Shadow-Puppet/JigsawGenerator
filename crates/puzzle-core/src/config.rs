@@ -1,3 +1,5 @@
+use rand::RngExt;
+use rand_chacha::ChaCha8Rng;
 use serde::{Deserialize, Serialize};
 
 /// Unit system for puzzle dimensions.
@@ -41,6 +43,14 @@ pub struct TabConfig {
     /// range; the WASM layer maps user 0→internal 0.5, user 1→internal 1.2.
     #[serde(default = "default_taper")]
     pub taper: f64,
+    /// Optional max for per-edge randomization. When Some, each edge gets
+    /// a random size_pct in [size_pct, size_pct_max] range.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub size_pct_max: Option<f64>,
+    /// Optional max for per-edge taper randomization. When Some, each edge gets
+    /// a random taper in [taper, taper_max] range.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub taper_max: Option<f64>,
 }
 
 fn default_taper() -> f64 {
@@ -52,6 +62,8 @@ impl Default for TabConfig {
         Self {
             size_pct: 0.25,
             taper: 0.5,
+            size_pct_max: None,
+            taper_max: None,
         }
     }
 }
@@ -71,6 +83,34 @@ impl TabConfig {
                 self.taper
             ));
         }
+        if let Some(max) = self.size_pct_max {
+            if max < 0.15 || max > 0.25 {
+                return Err(format!(
+                    "tab size_pct_max must be between 0.15 and 0.25, got {}",
+                    max
+                ));
+            }
+            if max < self.size_pct {
+                return Err(format!(
+                    "tab size_pct_max ({}) must be >= size_pct ({})",
+                    max, self.size_pct
+                ));
+            }
+        }
+        if let Some(max) = self.taper_max {
+            if max < 0.50 || max > 1.20 {
+                return Err(format!(
+                    "tab taper_max must be between 0.50 and 1.20, got {}",
+                    max
+                ));
+            }
+            if max < self.taper {
+                return Err(format!(
+                    "tab taper_max ({}) must be >= taper ({})",
+                    max, self.taper
+                ));
+            }
+        }
         Ok(())
     }
 
@@ -78,6 +118,49 @@ impl TabConfig {
     /// taper=0.50 → ratio=0.75 (mild), taper=0.85 → ratio=0.575, taper=1.20 → ratio=0.40 (aggressive).
     pub fn neck_ratio(&self) -> f64 {
         1.0 - self.taper * 0.5
+    }
+
+    /// Return the effective tab size for a single edge, optionally randomized.
+    ///
+    /// When `size_pct_max` is None, returns the fixed `size_pct` clamped to
+    /// `safe_max` without consuming any RNG values (backward compatible).
+    /// When `size_pct_max` is Some, returns a random value in
+    /// [size_pct.min(safe_max), size_pct_max.min(safe_max)].
+    pub fn randomize_tab_size(&self, safe_max: f64, rng: &mut ChaCha8Rng) -> f64 {
+        match self.size_pct_max {
+            None => self.size_pct.min(safe_max),
+            Some(max) => {
+                let lo = self.size_pct.min(safe_max);
+                let hi = max.min(safe_max);
+                if (hi - lo).abs() < 1e-10 {
+                    lo
+                } else {
+                    rng.random_range(lo..=hi)
+                }
+            }
+        }
+    }
+
+    /// Return the effective neck ratio for a single edge, optionally randomized.
+    ///
+    /// When `taper_max` is None, returns the fixed neck_ratio without consuming
+    /// any RNG values (backward compatible).
+    /// When `taper_max` is Some, picks a random taper in [taper, taper_max] and
+    /// computes neck_ratio from it.
+    pub fn randomize_neck_ratio(&self, rng: &mut ChaCha8Rng) -> f64 {
+        match self.taper_max {
+            None => self.neck_ratio(),
+            Some(max) => {
+                let lo = self.taper;
+                let hi = max;
+                let t = if (hi - lo).abs() < 1e-10 {
+                    lo
+                } else {
+                    rng.random_range(lo..=hi)
+                };
+                1.0 - t * 0.5
+            }
+        }
     }
 }
 
@@ -384,6 +467,8 @@ mod tests {
             TabConfig {
                 size_pct: 0.15,
                 taper: 0.50,
+                size_pct_max: None,
+                taper_max: None,
             },
             BorderConfig { corner_radius: 0.0 },
             String::new(),
@@ -401,6 +486,8 @@ mod tests {
             TabConfig {
                 size_pct: 0.25,
                 taper: 1.20,
+                size_pct_max: None,
+                taper_max: None,
             },
             BorderConfig {
                 corner_radius: 10.0,
@@ -410,7 +497,7 @@ mod tests {
         );
         assert!(config.is_ok());
 
-        // Maximum valid config
+        // Maximum valid config with ranges
         let config = PuzzleConfig::from_input(
             100,
             100,
@@ -418,8 +505,10 @@ mod tests {
             1000.0,
             Unit::Millimeters,
             TabConfig {
-                size_pct: 0.25,
-                taper: 1.20,
+                size_pct: 0.15,
+                taper: 0.50,
+                size_pct_max: Some(0.25),
+                taper_max: Some(1.20),
             },
             BorderConfig {
                 corner_radius: 10.0,
@@ -448,5 +537,140 @@ mod tests {
     fn test_default_kerf_zero() {
         let config = PuzzleConfig::default();
         assert!((config.kerf_width - 0.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_randomize_tab_size_none_returns_fixed() {
+        use crate::seed::create_rng;
+        let tab = TabConfig::default(); // size_pct_max = None
+        let mut rng1 = create_rng("test");
+        let mut rng2 = create_rng("test");
+
+        let val = tab.randomize_tab_size(0.25, &mut rng1);
+        assert!((val - 0.25).abs() < 1e-10, "should return fixed size_pct");
+
+        // RNG should not have been consumed — next random_bool should match fresh rng
+        let b1: bool = rng1.random_bool(0.5);
+        let b2: bool = rng2.random_bool(0.5);
+        assert_eq!(
+            b1, b2,
+            "RNG should not be consumed when size_pct_max is None"
+        );
+    }
+
+    #[test]
+    fn test_randomize_tab_size_some_produces_range() {
+        use crate::seed::create_rng;
+        let tab = TabConfig {
+            size_pct: 0.15,
+            taper: 0.50,
+            size_pct_max: Some(0.25),
+            taper_max: None,
+        };
+        let mut rng = create_rng("range-test");
+        let mut values = Vec::new();
+        for _ in 0..20 {
+            let v = tab.randomize_tab_size(0.25, &mut rng);
+            assert!(
+                v >= 0.15 - 1e-10 && v <= 0.25 + 1e-10,
+                "value {} out of range",
+                v
+            );
+            values.push(v);
+        }
+        // With 20 samples from [0.15, 0.25], we should see at least 2 distinct values
+        values.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        values.dedup_by(|a, b| (*a - *b).abs() < 1e-10);
+        assert!(
+            values.len() >= 2,
+            "should produce varied values, got {:?}",
+            values
+        );
+    }
+
+    #[test]
+    fn test_randomize_neck_ratio_none_returns_fixed() {
+        use crate::seed::create_rng;
+        let tab = TabConfig::default(); // taper_max = None
+        let mut rng = create_rng("test");
+        let val = tab.randomize_neck_ratio(&mut rng);
+        assert!(
+            (val - tab.neck_ratio()).abs() < 1e-10,
+            "should return fixed neck_ratio"
+        );
+    }
+
+    #[test]
+    fn test_randomize_neck_ratio_some_produces_range() {
+        use crate::seed::create_rng;
+        let tab = TabConfig {
+            size_pct: 0.25,
+            taper: 0.50,
+            size_pct_max: None,
+            taper_max: Some(1.20),
+        };
+        let mut rng = create_rng("neck-range-test");
+        let mut values = Vec::new();
+        for _ in 0..20 {
+            let v = tab.randomize_neck_ratio(&mut rng);
+            // taper in [0.50, 1.20] → neck_ratio in [0.40, 0.75]
+            assert!(
+                v >= 0.40 - 1e-10 && v <= 0.75 + 1e-10,
+                "neck_ratio {} out of range",
+                v
+            );
+            values.push(v);
+        }
+        values.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        values.dedup_by(|a, b| (*a - *b).abs() < 1e-10);
+        assert!(
+            values.len() >= 2,
+            "should produce varied neck ratios, got {:?}",
+            values
+        );
+    }
+
+    #[test]
+    fn test_validate_size_pct_max_out_of_range() {
+        let tab = TabConfig {
+            size_pct: 0.20,
+            taper: 0.50,
+            size_pct_max: Some(0.30), // too large
+            taper_max: None,
+        };
+        assert!(tab.validate().is_err());
+    }
+
+    #[test]
+    fn test_validate_size_pct_max_less_than_min() {
+        let tab = TabConfig {
+            size_pct: 0.20,
+            taper: 0.50,
+            size_pct_max: Some(0.15), // less than size_pct
+            taper_max: None,
+        };
+        assert!(tab.validate().is_err());
+    }
+
+    #[test]
+    fn test_validate_taper_max_out_of_range() {
+        let tab = TabConfig {
+            size_pct: 0.20,
+            taper: 0.50,
+            size_pct_max: None,
+            taper_max: Some(1.50), // too large
+        };
+        assert!(tab.validate().is_err());
+    }
+
+    #[test]
+    fn test_validate_taper_max_less_than_min() {
+        let tab = TabConfig {
+            size_pct: 0.20,
+            taper: 0.80,
+            size_pct_max: None,
+            taper_max: Some(0.50), // less than taper
+        };
+        assert!(tab.validate().is_err());
     }
 }
