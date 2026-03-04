@@ -80,6 +80,7 @@ Phase 4 [x] Web GUI & Live Preview (2/2 plans)
 - history.replaceState (not pushState) for URL sync — avoids polluting browser history
 - CSS stroke-width override for screen display; downloaded SVGs preserve hairline strokes for laser cutting
 - URL param abbreviations: w/h, mm/in, tab/jitter as integer percentages for compact shareable URLs
+- Taper range adjusted to 0.30..=1.10; old URL params clamped for backward compat (quick-001)
 
 ### Research Flags
 - **Phase 3 (Connectors):** Complete. Connector generation + SVG export pipeline fully functional.
@@ -101,9 +102,9 @@ Phase 4 [x] Web GUI & Live Preview (2/2 plans)
 
 ## Session Continuity
 
-**Last session:** 2026-03-03T22:55:47Z
-**Stopped at:** Completed 04-02-PLAN.md
-**Next action:** Milestone complete — all 4 phases done (`/gsd-complete-milestone`)
+**Last session:** 2026-03-04T05:09:16Z
+**Stopped at:** Completed quick-001-01-PLAN.md
+**Next action:** Milestone complete — all 4 phases done, quick-001 applied
 
 ---
-*Last updated: 2026-03-03T22:55:47Z*
+*Last updated: 2026-03-04T05:09:16Z*
