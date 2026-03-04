@@ -35,9 +35,9 @@ pub struct TabConfig {
     /// The effective maximum is dynamically clamped based on grid dimensions
     /// to prevent opposing tabs from overlapping.
     pub size_pct: f64,
-    /// Taper amount controlling the neck-to-body ratio (0.0..=1.0, default 0.5).
-    /// 0.0 = no taper (cylindrical tab), 0.5 = moderate snap-fit (current classic),
-    /// 1.0 = aggressive taper (narrow neck, wide body).
+    /// Taper amount controlling the neck-to-body ratio (0.30..=1.10, default 0.5).
+    /// 0.30 = mild taper, 0.5 = moderate snap-fit (current classic),
+    /// 1.10 = aggressive taper (narrow neck, wide body).
     #[serde(default = "default_taper")]
     pub taper: f64,
 }
@@ -64,9 +64,9 @@ impl TabConfig {
                 self.size_pct
             ));
         }
-        if self.taper < 0.0 || self.taper > 1.0 {
+        if self.taper < 0.30 || self.taper > 1.10 {
             return Err(format!(
-                "tab taper must be between 0.0 and 1.0, got {}",
+                "tab taper must be between 0.30 and 1.10, got {}",
                 self.taper
             ));
         }
@@ -382,7 +382,7 @@ mod tests {
             Unit::Millimeters,
             TabConfig {
                 size_pct: 0.15,
-                taper: 0.5,
+                taper: 0.30,
             },
             BorderConfig { corner_radius: 0.0 },
             String::new(),
@@ -399,7 +399,7 @@ mod tests {
             Unit::Millimeters,
             TabConfig {
                 size_pct: 0.45,
-                taper: 1.0,
+                taper: 1.10,
             },
             BorderConfig {
                 corner_radius: 10.0,
@@ -418,7 +418,7 @@ mod tests {
             Unit::Millimeters,
             TabConfig {
                 size_pct: 0.45,
-                taper: 1.0,
+                taper: 1.10,
             },
             BorderConfig {
                 corner_radius: 10.0,
