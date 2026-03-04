@@ -82,6 +82,7 @@ Phase 4 [x] Web GUI & Live Preview (2/2 plans)
 - URL param abbreviations: w/h, mm/in, tab/jitter as integer percentages for compact shareable URLs
 - Taper range adjusted to 0.30..=1.10; old URL params clamped for backward compat (quick-001)
 - Taper slider normalized to 0-1 user-facing range with linear interpolation to internal 0.5-1.2 (quick-002)
+- Max tab size capped at 25% (was 45%) to prevent oversized/overlapping connectors (quick-003)
 
 ### Research Flags
 - **Phase 3 (Connectors):** Complete. Connector generation + SVG export pipeline fully functional.
@@ -107,13 +108,14 @@ Phase 4 [x] Web GUI & Live Preview (2/2 plans)
 |---|-------------|------|--------|-----------|
 | 001 | Adjust taper range - make .30 the minimum and increase maximum by 10% | 2026-03-04 | 90325ae | [001-adjust-taper-range-make-30-the-minimum-a](./quick/001-adjust-taper-range-make-30-the-minimum-a/) |
 | 002 | Change taper range to 0-1 (user) / 0.5-1.2 (internal) | 2026-03-04 | 31e6755 | [002-change-taper-range-to-0-5-1-2-internally](./quick/002-change-taper-range-to-0-5-1-2-internally/) |
+| 003 | Set the max tab size to 25% | 2026-03-04 | ec0f42a | [3-set-the-max-tab-size-to-25](./quick/3-set-the-max-tab-size-to-25/) |
 
 ## Session Continuity
 
-**Last session:** 2026-03-04T15:28:00Z
-**Stopped at:** Completed quick task 002: change taper range to normalized 0-1 slider
-**Next action:** Milestone complete — all 4 phases done, quick-001 and quick-002 applied
+**Last session:** 2026-03-04T15:51:00Z
+**Stopped at:** Completed quick task 003: set max tab size to 25%
+**Next action:** Milestone complete — all 4 phases done, quick-001/002/003 applied
 
 ---
-Last activity: 2026-03-04 - Completed quick task 002: change taper range to 0-1 (user) / 0.5-1.2 (internal)
-*Last updated: 2026-03-04T15:28:00Z*
+Last activity: 2026-03-04 - Completed quick task 003: set max tab size to 25%
+*Last updated: 2026-03-04T15:51:00Z*
