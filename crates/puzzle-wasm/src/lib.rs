@@ -204,14 +204,12 @@ pub fn generate_grid(config_json: &str) -> String {
 
 /// Generate a laser-cutter-ready SVG from a JSON configuration string.
 ///
-/// Accepts full PuzzleConfig JSON (same as `generate_grid`), with optional
-/// `kerf_width` field (defaults to 0.0 if omitted for backward compatibility).
+/// Accepts full PuzzleConfig JSON (same as `generate_grid`).
 ///
 /// Returns a complete SVG string with:
 /// - Physical mm dimensions and viewBox
 /// - Single `<path>` with all cut lines (border + connectors)
 /// - Hairline black stroke, no fill
-/// - Optional kerf compensation when `kerf_width > 0`
 ///
 /// On error: `{"error": "message"}`
 #[wasm_bindgen]
@@ -443,27 +441,6 @@ mod tests {
     }
 
     #[test]
-    fn test_generate_svg_with_kerf() {
-        let config_no_kerf = r#"{"rows":3,"cols":4,"width":200.0,"height":150.0,"unit":"Millimeters","tab":{"size_pct":0.25},"border":{"corner_radius":2.0},"seed":"kerf-test","kerf_width":0.0}"#;
-        let config_with_kerf = r#"{"rows":3,"cols":4,"width":200.0,"height":150.0,"unit":"Millimeters","tab":{"size_pct":0.25},"border":{"corner_radius":2.0},"seed":"kerf-test","kerf_width":0.1}"#;
-        let svg_no_kerf = generate_svg(config_no_kerf);
-        let svg_with_kerf = generate_svg(config_with_kerf);
-
-        // Both should be valid SVGs
-        assert!(
-            svg_no_kerf.starts_with("<svg"),
-            "no-kerf should be valid SVG"
-        );
-        assert!(
-            svg_with_kerf.starts_with("<svg"),
-            "with-kerf should be valid SVG"
-        );
-
-        // They should differ (kerf changes the path data)
-        assert_ne!(svg_no_kerf, svg_with_kerf, "kerf should change SVG output");
-    }
-
-    #[test]
     fn test_generate_svg_deterministic() {
         let config_json = r#"{"rows":3,"cols":4,"width":200.0,"height":150.0,"unit":"Millimeters","tab":{"size_pct":0.25},"border":{"corner_radius":2.0},"seed":"determ-svg"}"#;
         let svg1 = generate_svg(config_json);
@@ -478,18 +455,5 @@ mod tests {
             result.contains(r#""error""#),
             "should return error JSON for invalid input"
         );
-    }
-
-    #[test]
-    fn test_generate_svg_backward_compat() {
-        // Config JSON without kerf_width field — should default to 0.0
-        let config_json = r#"{"rows":3,"cols":4,"width":200.0,"height":150.0,"unit":"Millimeters","tab":{"size_pct":0.25},"border":{"corner_radius":2.0},"seed":"compat-test"}"#;
-        let result = generate_svg(config_json);
-        assert!(
-            result.starts_with("<svg"),
-            "should produce valid SVG without kerf_width in JSON, got: {}...",
-            &result[..50.min(result.len())]
-        );
-        assert!(!result.contains(r#""error""#), "should not be an error");
     }
 }

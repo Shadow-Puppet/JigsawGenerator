@@ -31,7 +31,6 @@ let unitSelect: HTMLSelectElement;
 let tabSlider: HTMLInputElement;
 let taperSlider: HTMLInputElement;
 let radiusSlider: HTMLInputElement;
-let kerfSlider: HTMLInputElement;
 let seedInput: HTMLInputElement;
 let svgContainer: HTMLElement;
 let pieceCount: HTMLElement;
@@ -40,8 +39,6 @@ let errorDisplay: HTMLElement;
 let tabReadout: HTMLElement;
 let taperReadout: HTMLElement;
 let radiusReadout: HTMLElement;
-let kerfReadout: HTMLElement;
-
 let tabRandomize: HTMLInputElement;
 let tabMaxSlider: HTMLInputElement;
 let taperRandomize: HTMLInputElement;
@@ -90,7 +87,6 @@ function buildConfig(): object {
     tab: tabConfig,
     border: { corner_radius: parseFloat(radiusSlider.value) },
     seed: seedInput.value,
-    kerf_width: parseFloat(kerfSlider.value),
   };
 }
 
@@ -110,7 +106,6 @@ function loadFromURL(): boolean {
   const radius = parseFloat(params.get("radius") ?? "2");
   const taperUser = parseInt(params.get("taper") ?? "0", 10) / 100;
   const taper = Math.max(0, Math.min(1, taperUser));
-  const kerf = parseFloat(params.get("kerf") ?? "0");
   const seed = params.get("seed") ?? "";
 
   rowsInput.value = String(rows);
@@ -121,7 +116,6 @@ function loadFromURL(): boolean {
   tabSlider.value = String(tab);
   taperSlider.value = String(taper);
   radiusSlider.value = String(radius);
-  kerfSlider.value = String(kerf);
   seedInput.value = seed || randomSeed();
 
   // Restore randomize state
@@ -154,7 +148,6 @@ function updateURL(): void {
   params.set("tab", String(Math.round(tabObj.size_pct * 100)));
   params.set("taper", String(Math.round(parseFloat(taperSlider.value) * 100)));
   params.set("radius", String(borderObj.corner_radius));
-  params.set("kerf", String(config.kerf_width));
   params.set("seed", String(config.seed));
   if (tabRandomize.checked) {
     params.set("tabr", "1");
@@ -210,9 +203,19 @@ function applyTransform(): void {
 }
 
 function resetZoom(): void {
+  // First reset transform so we can measure natural SVG height
   zoomLevel = 1;
   panX = 0;
   panY = 0;
+  svgContainer.style.transform = "translate(0px, 0px) scale(1)";
+
+  // Vertically center: offset by half the difference between viewport and SVG height
+  const svgEl = svgContainer.querySelector("svg");
+  if (svgEl && svgViewport) {
+    const viewportH = svgViewport.clientHeight;
+    const svgH = svgEl.getBoundingClientRect().height;
+    panY = Math.max(0, (viewportH - svgH) / 2);
+  }
   applyTransform();
 }
 
@@ -271,9 +274,8 @@ function generatePuzzle(): void {
   // Update URL with current params (replaceState — no history spam)
   updateURL();
 
-  // Update ruler and reset zoom on each generation
+  // Update ruler (zoom/pan state preserved across regenerations)
   updateRuler();
-  resetZoom();
 }
 
 // ─── Readout Updaters ───────────────────────────────────────
@@ -292,7 +294,6 @@ function updateReadouts(): void {
     taperReadout.textContent = parseFloat(taperSlider.value).toFixed(2);
   }
   radiusReadout.textContent = parseFloat(radiusSlider.value).toFixed(1);
-  kerfReadout.textContent = parseFloat(kerfSlider.value).toFixed(2);
 }
 
 // ─── Randomize Toggle Helpers ────────────────────────────────
@@ -304,9 +305,18 @@ function toggleRandomize(
 ): void {
   if (checkbox.checked) {
     maxSlider.style.display = "";
-    // Ensure max >= min
-    if (parseFloat(maxSlider.value) < parseFloat(minSlider.value)) {
-      maxSlider.value = minSlider.value;
+    // Ensure max > min (at least one step apart)
+    const step = parseFloat(minSlider.step) || 0.01;
+    const minVal = parseFloat(minSlider.value);
+    const maxVal = parseFloat(maxSlider.value);
+    const sliderMax = parseFloat(maxSlider.max);
+    if (maxVal <= minVal) {
+      if (minVal + step <= sliderMax) {
+        maxSlider.value = String(minVal + step);
+      } else {
+        minSlider.value = String(sliderMax - step);
+        maxSlider.value = String(sliderMax);
+      }
     }
   } else {
     maxSlider.style.display = "none";
@@ -319,8 +329,15 @@ function clampMinMax(
   minSlider: HTMLInputElement,
   maxSlider: HTMLInputElement
 ): void {
-  if (parseFloat(maxSlider.value) < parseFloat(minSlider.value)) {
-    maxSlider.value = minSlider.value;
+  const step = parseFloat(minSlider.step) || 0.01;
+  const max = parseFloat(maxSlider.max);
+  // Don't let min get so high that max can't stay one step above it
+  const minCeiling = max - step;
+  if (parseFloat(minSlider.value) > minCeiling) {
+    minSlider.value = String(minCeiling);
+  }
+  if (parseFloat(maxSlider.value) <= parseFloat(minSlider.value)) {
+    maxSlider.value = String(parseFloat(minSlider.value) + step);
   }
 }
 
@@ -328,8 +345,15 @@ function clampMaxMin(
   minSlider: HTMLInputElement,
   maxSlider: HTMLInputElement
 ): void {
-  if (parseFloat(minSlider.value) > parseFloat(maxSlider.value)) {
-    minSlider.value = maxSlider.value;
+  const step = parseFloat(minSlider.step) || 0.01;
+  const min = parseFloat(minSlider.min);
+  // Don't let max get so low that min can't stay one step below it
+  const maxFloor = min + step;
+  if (parseFloat(maxSlider.value) < maxFloor) {
+    maxSlider.value = String(maxFloor);
+  }
+  if (parseFloat(minSlider.value) >= parseFloat(maxSlider.value)) {
+    minSlider.value = String(parseFloat(maxSlider.value) - step);
   }
 }
 
@@ -375,7 +399,6 @@ async function main(): Promise<void> {
   tabSlider = document.getElementById("tab") as HTMLInputElement;
   taperSlider = document.getElementById("taper") as HTMLInputElement;
   radiusSlider = document.getElementById("radius") as HTMLInputElement;
-  kerfSlider = document.getElementById("kerf") as HTMLInputElement;
   seedInput = document.getElementById("seed") as HTMLInputElement;
   svgContainer = document.getElementById("svg-container")!;
   pieceCount = document.getElementById("piece-count")!;
@@ -384,8 +407,6 @@ async function main(): Promise<void> {
   tabReadout = document.getElementById("tab-readout")!;
   taperReadout = document.getElementById("taper-readout")!;
   radiusReadout = document.getElementById("radius-readout")!;
-  kerfReadout = document.getElementById("kerf-readout")!;
-
   tabRandomize = document.getElementById("tab-randomize") as HTMLInputElement;
   tabMaxSlider = document.getElementById("tab-max") as HTMLInputElement;
   taperRandomize = document.getElementById("taper-randomize") as HTMLInputElement;
@@ -425,7 +446,7 @@ async function main(): Promise<void> {
   }
 
   // Range sliders — update readout + regenerate
-  const sliders = [tabSlider, taperSlider, radiusSlider, kerfSlider];
+  const sliders = [tabSlider, taperSlider, radiusSlider];
   for (const slider of sliders) {
     slider.addEventListener("input", () => {
       // When randomize is on, clamp min <= max
@@ -672,6 +693,7 @@ async function main(): Promise<void> {
   // ─── Initial Generate ─────────────────────────────────────
 
   generatePuzzle();
+  resetZoom(); // Center vertically on first load
 }
 
 main();
