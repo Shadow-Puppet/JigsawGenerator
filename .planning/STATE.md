@@ -89,6 +89,8 @@ Phase 4 [x] Web GUI & Live Preview (2/2 plans)
 - convertDimensions() with factor 25.4 and parseFloat(toFixed(2)) for clean unit conversion display (quick-006)
 - SVG viewBox normalization: remove width/height attrs, rely on viewBox for responsive fill; re-generate from WASM on download to preserve physical dimensions (quick-007)
 - Cursor-centered zoom via transform-origin 0,0 with translate+scale; zoom resets on puzzle regeneration (quick-007)
+- Piece count input auto-calcs best rows/cols for target with squarest-piece tiebreaker; no URL param needed (derived from rows*cols) (quick-010)
+- Piece size warning at <10mm threshold, visible but non-blocking (quick-010)
 
 ### Research Flags
 - **Phase 3 (Connectors):** Complete. Connector generation + SVG export pipeline fully functional.
@@ -121,13 +123,14 @@ Phase 4 [x] Web GUI & Live Preview (2/2 plans)
 | 007 | SVG preview: fill container width, add ruler, enable zoom/pan | 2026-03-04 | 5ee5e4d | [7-svg-preview-fill-container-width-add-rul](./quick/7-svg-preview-fill-container-width-add-rul/) |
 | 008 | Fix kerf width setting - offset border only, not connectors | 2026-03-04 | b2d77de | [8-investigate-and-fix-kerf-width-setting-c](./quick/8-investigate-and-fix-kerf-width-setting-c/) |
 | 009 | Remove kerf width feature entirely | 2026-03-04 | efb9242 | [9-remove-kerf-width-feature-entirely-delet](./quick/9-remove-kerf-width-feature-entirely-delet/) |
+| 010 | Add piece count input with auto row/col calculation | 2026-03-04 | c559db3 | [10-add-piece-count-input-with-auto-row-col-](./quick/10-add-piece-count-input-with-auto-row-col-/) |
 
 ## Session Continuity
 
-**Last session:** 2026-03-04T21:47:22Z
-**Stopped at:** Completed quick task 009: Remove kerf width feature entirely
-**Next action:** Milestone complete — all 4 phases done, quick-001 through 009 applied
+**Last session:** 2026-03-04T21:57:00Z
+**Stopped at:** Completed quick task 010: Add piece count input with auto row/col calculation
+**Next action:** Milestone complete — all 4 phases done, quick-001 through 010 applied
 
 ---
-Last activity: 2026-03-04 - Completed quick task 009: Remove kerf width feature entirely
-*Last updated: 2026-03-04T21:47:22Z*
+Last activity: 2026-03-04 - Completed quick task 010: Add piece count input with auto row/col calculation
+*Last updated: 2026-03-04T21:57:00Z*
