@@ -72,7 +72,8 @@ function loadFromURL(): boolean {
   const unit = unitParam === "in" ? "Inches" : "Millimeters";
   const tab = parseInt(params.get("tab") ?? "25", 10) / 100;
   const radius = parseFloat(params.get("radius") ?? "2");
-  const taper = parseInt(params.get("taper") ?? "50", 10) / 100; // 50 → 0.5
+  const taperRaw = parseInt(params.get("taper") ?? "50", 10) / 100;
+  const taper = Math.max(0.30, Math.min(1.10, taperRaw)); // clamp to valid range
   const kerf = parseFloat(params.get("kerf") ?? "0");
   const seed = params.get("seed") ?? "";
 
