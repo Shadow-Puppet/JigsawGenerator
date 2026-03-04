@@ -164,7 +164,7 @@ impl PuzzleGrid {
         let theoretical_max = max_h.min(max_v).min(max_approach);
 
         // Apply 90% safety margin, floor at 0.15 (minimum valid)
-        (theoretical_max * 0.9).max(0.15).min(0.45)
+        (theoretical_max * 0.9).max(0.15).min(0.25)
     }
 
     /// Populate connector geometry on all internal edges.

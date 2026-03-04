@@ -363,7 +363,7 @@ mod tests {
         let large_params = EdgeParams {
             length: 50.0,
             direction: TabDirection::Out,
-            tab_size: 0.45,
+            tab_size: 0.25,
             neck_ratio: 0.75,
         };
 

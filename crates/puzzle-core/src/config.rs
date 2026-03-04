@@ -31,7 +31,7 @@ impl Unit {
 /// Tab/knob configuration for connector generation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TabConfig {
-    /// Tab size as a fraction of edge length (0.15..=0.45, default 0.25).
+    /// Tab size as a fraction of edge length (0.15..=0.25, default 0.25).
     /// The effective maximum is dynamically clamped based on grid dimensions
     /// to prevent opposing tabs from overlapping.
     pub size_pct: f64,
@@ -59,9 +59,9 @@ impl Default for TabConfig {
 impl TabConfig {
     /// Validate that tab parameters are within acceptable bounds.
     pub fn validate(&self) -> Result<(), String> {
-        if self.size_pct < 0.15 || self.size_pct > 0.45 {
+        if self.size_pct < 0.15 || self.size_pct > 0.25 {
             return Err(format!(
-                "tab size_pct must be between 0.15 and 0.45, got {}",
+                "tab size_pct must be between 0.15 and 0.25, got {}",
                 self.size_pct
             ));
         }
@@ -300,7 +300,7 @@ mod tests {
     #[test]
     fn test_validate_tab_too_large() {
         let mut config = PuzzleConfig::default();
-        config.tab.size_pct = 0.50;
+        config.tab.size_pct = 0.30;
         assert!(config.validate().is_err());
     }
 
@@ -399,7 +399,7 @@ mod tests {
             1000.0,
             Unit::Millimeters,
             TabConfig {
-                size_pct: 0.45,
+                size_pct: 0.25,
                 taper: 1.20,
             },
             BorderConfig {
@@ -418,7 +418,7 @@ mod tests {
             1000.0,
             Unit::Millimeters,
             TabConfig {
-                size_pct: 0.45,
+                size_pct: 0.25,
                 taper: 1.20,
             },
             BorderConfig {
