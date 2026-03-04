@@ -1,6 +1,6 @@
 use std::f64::consts::PI;
 
-use kurbo::{Affine, Arc, BezPath, Point, Vec2};
+use kurbo::{Affine, Arc, BezPath, PathEl, Point, Vec2};
 
 use crate::grid::PuzzleGrid;
 use crate::kerf::offset_path;
@@ -19,13 +19,26 @@ use crate::kerf::offset_path;
 /// - Internal edges as open subpaths with connector curves
 /// - Optional kerf compensation when `config.kerf_width > 0`
 pub fn generate_svg(grid: &PuzzleGrid) -> String {
-    let mut path = build_puzzle_path(grid);
+    let mut border = build_border_path(grid);
+    let connectors = build_connector_paths(grid);
 
     if grid.config.kerf_width > 0.0 {
-        path = offset_path(&path, grid.config.kerf_width);
+        border = offset_path(&border, grid.config.kerf_width);
     }
 
-    let path_data = path.to_svg();
+    // Combine: border first, then connectors
+    let mut combined = border;
+    for el in connectors.iter() {
+        match el {
+            PathEl::MoveTo(p) => combined.move_to(p),
+            PathEl::LineTo(p) => combined.line_to(p),
+            PathEl::CurveTo(p1, p2, p3) => combined.curve_to(p1, p2, p3),
+            PathEl::ClosePath => combined.close_path(),
+            _ => {}
+        }
+    }
+
+    let path_data = combined.to_svg();
     build_svg_document(&path_data, grid.config.width, grid.config.height)
 }
 
@@ -36,7 +49,29 @@ pub fn generate_svg(grid: &PuzzleGrid) -> String {
 ///    rounded corners at the 4 puzzle corners
 /// 2. Open subpaths for each internal edge, with connector bezier curves
 ///    transformed from edge-local to global coordinates
+#[allow(dead_code)]
 fn build_puzzle_path(grid: &PuzzleGrid) -> BezPath {
+    let border = build_border_path(grid);
+    let connectors = build_connector_paths(grid);
+
+    let mut path = border;
+    for el in connectors.iter() {
+        match el {
+            PathEl::MoveTo(p) => path.move_to(p),
+            PathEl::LineTo(p) => path.line_to(p),
+            PathEl::CurveTo(p1, p2, p3) => path.curve_to(p1, p2, p3),
+            PathEl::ClosePath => path.close_path(),
+            _ => {}
+        }
+    }
+    path
+}
+
+/// Construct the border as a closed BezPath with rounded corners.
+///
+/// Walk clockwise: top → right → bottom → left with quarter-circle arcs
+/// at each corner. Returns a single closed subpath.
+fn build_border_path(grid: &PuzzleGrid) -> BezPath {
     let mut path = BezPath::new();
 
     let w = grid.config.width;
@@ -45,10 +80,6 @@ fn build_puzzle_path(grid: &PuzzleGrid) -> BezPath {
 
     // Clamp radius to avoid exceeding half the smallest dimension
     let r = r.min(w / 2.0).min(h / 2.0);
-
-    // ─── Group 1: Border (closed subpath) ─────────────────────────
-    // Walk clockwise: top → right → bottom → left
-    // Starting after the top-left corner arc
 
     // Start at top edge, after top-left corner
     path.move_to(Point::new(r, 0.0));
@@ -88,7 +119,17 @@ fn build_puzzle_path(grid: &PuzzleGrid) -> BezPath {
     // Close the border
     path.close_path();
 
-    // ─── Group 2: Internal edges (open subpaths) ──────────────────
+    path
+}
+
+/// Construct all internal edge connector curves as open subpaths.
+///
+/// Each internal edge becomes an open subpath starting with MoveTo at
+/// the first control point, followed by CurveTo segments for the
+/// connector bezier curves.
+fn build_connector_paths(grid: &PuzzleGrid) -> BezPath {
+    let mut path = BezPath::new();
+
     let rows = grid.config.rows as usize;
     let cols = grid.config.cols as usize;
 
