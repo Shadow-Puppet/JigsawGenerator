@@ -265,6 +265,21 @@ function clampMaxMin(
   }
 }
 
+// ─── Unit Conversion ─────────────────────────────────────────
+
+function convertDimensions(oldUnit: string, newUnit: string): void {
+  if (oldUnit === newUnit) return;
+  const factor = newUnit === "Inches" ? 1 / 25.4 : 25.4;
+  const w = parseFloat(widthInput.value);
+  const h = parseFloat(heightInput.value);
+  if (!isNaN(w)) {
+    widthInput.value = parseFloat((w * factor).toFixed(2)).toString();
+  }
+  if (!isNaN(h)) {
+    heightInput.value = parseFloat((h * factor).toFixed(2)).toString();
+  }
+}
+
 // ─── Main ───────────────────────────────────────────────────
 
 async function main(): Promise<void> {
@@ -318,6 +333,9 @@ async function main(): Promise<void> {
   updateTabMax();
   updateReadouts();
 
+  // Track previous unit for dimension conversion on unit change
+  let previousUnit = unitSelect.value;
+
   // ─── Event Wiring ───────────────────────────────────────
 
   // Number inputs — instant regeneration + recalculate tab max
@@ -366,8 +384,11 @@ async function main(): Promise<void> {
     toggleRandomize(taperRandomize, taperMaxSlider, taperSlider);
   });
 
-  // Unit select — also recalculate tab max (mm vs inches changes cell dimensions)
+  // Unit select — convert dimensions and recalculate tab max
   unitSelect.addEventListener("change", () => {
+    const newUnit = unitSelect.value;
+    convertDimensions(previousUnit, newUnit);
+    previousUnit = newUnit;
     updateTabMax();
     generatePuzzle();
   });
