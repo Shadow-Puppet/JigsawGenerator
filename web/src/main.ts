@@ -70,7 +70,7 @@ function loadFromURL(): boolean {
   const h = parseFloat(params.get("h") ?? "210");
   const unitParam = params.get("unit") ?? "mm";
   const unit = unitParam === "in" ? "Inches" : "Millimeters";
-  const tab = parseInt(params.get("tab") ?? "25", 10) / 100;
+  const tab = Math.max(0.15, Math.min(0.25, parseInt(params.get("tab") ?? "25", 10) / 100));
   const radius = parseFloat(params.get("radius") ?? "2");
   const taperUser = parseInt(params.get("taper") ?? "0", 10) / 100;
   const taper = Math.max(0, Math.min(1, taperUser));

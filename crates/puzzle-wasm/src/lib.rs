@@ -243,14 +243,23 @@ pub fn generate_svg(config_json: &str) -> String {
 /// Compute the safe maximum tab size for a given grid configuration.
 ///
 /// Accepts JSON: `{"rows": N, "cols": M, "width": W, "height": H}`
-/// Returns JSON: `{"max": 0.35}` (the safe maximum tab size_pct)
+/// Returns JSON: `{"max": 0.25}` (the safe maximum tab size_pct)
 /// Or on error: `{"error": "message"}`
+///
+/// Note: Clamps tab/taper to valid ranges before creating the grid so this
+/// function works even when the current slider value is out of range (e.g.
+/// during initial load from a stale URL).
 #[wasm_bindgen]
 pub fn safe_tab_max(config_json: &str) -> String {
-    let config: PuzzleConfig = match serde_json::from_str(config_json) {
+    let mut config: PuzzleConfig = match serde_json::from_str(config_json) {
         Ok(c) => c,
         Err(e) => return format!(r#"{{"error":"Invalid JSON: {}"}}"#, e),
     };
+
+    // Clamp tab params to valid ranges so PuzzleGrid::new() doesn't reject
+    // the config — the whole point of this function is to *compute* the max.
+    config.tab.size_pct = config.tab.size_pct.clamp(0.15, 0.25);
+    config.tab.taper = config.tab.taper.clamp(0.50, 1.20);
 
     let grid = match PuzzleGrid::new(config) {
         Ok(g) => g,
