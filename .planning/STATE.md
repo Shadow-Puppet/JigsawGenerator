@@ -84,6 +84,7 @@ Phase 4 [x] Web GUI & Live Preview (2/2 plans)
 - Taper slider normalized to 0-1 user-facing range with linear interpolation to internal 0.5-1.2 (quick-002)
 - Max tab size capped at 25% (was 45%) to prevent oversized/overlapping connectors (quick-003)
 - safe_tab_max() must clamp inputs before validation — otherwise out-of-range slider values cause validation failure, silently preventing max updates (quick-004)
+- Optional size_pct_max/taper_max fields with serde skip_serializing_if; randomize helpers consume zero RNG when None for backward compat (quick-005)
 
 ### Research Flags
 - **Phase 3 (Connectors):** Complete. Connector generation + SVG export pipeline fully functional.
@@ -111,13 +112,14 @@ Phase 4 [x] Web GUI & Live Preview (2/2 plans)
 | 002 | Change taper range to 0-1 (user) / 0.5-1.2 (internal) | 2026-03-04 | 31e6755 | [002-change-taper-range-to-0-5-1-2-internally](./quick/002-change-taper-range-to-0-5-1-2-internally/) |
 | 003 | Set the max tab size to 25% | 2026-03-04 | ec0f42a | [3-set-the-max-tab-size-to-25](./quick/3-set-the-max-tab-size-to-25/) |
 | 004 | Rebuild WASM and fix safe_tab_max validation chicken-and-egg bug | 2026-03-04 | 2e1ce8e | [4-rebuild-wasm-and-fix-safe-tab-max-valida](./quick/4-rebuild-wasm-and-fix-safe-tab-max-valida/) |
+| 005 | Add randomize-per-edge option to tab size and taper | 2026-03-04 | 2f589ef | [5-add-randomize-per-edge-option-to-tab-siz](./quick/5-add-randomize-per-edge-option-to-tab-siz/) |
 
 ## Session Continuity
 
-**Last session:** 2026-03-04T16:11:00Z
-**Stopped at:** Completed quick task 004: fix safe_tab_max validation bug and rebuild WASM
-**Next action:** Milestone complete — all 4 phases done, quick-001/002/003/004 applied
+**Last session:** 2026-03-04T18:31:00Z
+**Stopped at:** Completed quick task 005: add randomize-per-edge option to tab size and taper
+**Next action:** Milestone complete — all 4 phases done, quick-001/002/003/004/005 applied
 
 ---
-Last activity: 2026-03-04 - Completed quick task 004: Rebuild WASM and fix safe_tab_max validation bug
-*Last updated: 2026-03-04T16:11:00Z*
+Last activity: 2026-03-04 - Completed quick task 005: Add randomize-per-edge option to tab size and taper
+*Last updated: 2026-03-04T18:31:00Z*
