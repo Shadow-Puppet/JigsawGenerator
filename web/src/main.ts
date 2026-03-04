@@ -44,6 +44,9 @@ let tabMaxSlider: HTMLInputElement;
 let taperRandomize: HTMLInputElement;
 let taperMaxSlider: HTMLInputElement;
 
+let pieceTargetInput: HTMLInputElement;
+let pieceSizeWarning: HTMLElement;
+
 let rulerWidth: HTMLElement;
 let rulerHeight: HTMLElement;
 let svgViewport: HTMLElement;
@@ -372,6 +375,76 @@ function convertDimensions(oldUnit: string, newUnit: string): void {
   }
 }
 
+// ─── Piece Count / Grid Auto-calc ─────────────────────────────
+
+function calcBestGrid(target: number): void {
+  const w = parseFloat(widthInput.value);
+  const h = parseFloat(heightInput.value);
+  if (isNaN(w) || isNaN(h) || w <= 0 || h <= 0 || isNaN(target) || target < 4) return;
+
+  let bestRows = 2;
+  let bestCols = 2;
+  let bestDist = Infinity;
+  let bestAspectDiff = Infinity;
+
+  const maxR = Math.min(target, 100);
+  for (let r = 2; r <= maxR; r++) {
+    let c = Math.round(target / r);
+    c = Math.max(2, Math.min(100, c));
+    const total = r * c;
+    const dist = Math.abs(total - target);
+    // Piece aspect ratio: (w/c) / (h/r) — want closest to 1
+    const pieceAspect = (w / c) / (h / r);
+    const aspectDiff = Math.abs(pieceAspect - 1);
+
+    if (dist < bestDist || (dist === bestDist && aspectDiff < bestAspectDiff)) {
+      bestRows = r;
+      bestCols = c;
+      bestDist = dist;
+      bestAspectDiff = aspectDiff;
+    }
+  }
+
+  rowsInput.value = String(bestRows);
+  colsInput.value = String(bestCols);
+  updateTabMax();
+  updateReadouts();
+  generatePuzzle();
+}
+
+function syncPieceCount(): void {
+  const rows = parseInt(rowsInput.value, 10);
+  const cols = parseInt(colsInput.value, 10);
+  if (!isNaN(rows) && !isNaN(cols)) {
+    pieceTargetInput.value = String(rows * cols);
+  }
+}
+
+function checkPieceSize(): void {
+  const rows = parseInt(rowsInput.value, 10);
+  const cols = parseInt(colsInput.value, 10);
+  const w = parseFloat(widthInput.value);
+  const h = parseFloat(heightInput.value);
+  if (isNaN(rows) || isNaN(cols) || isNaN(w) || isNaN(h) || rows < 1 || cols < 1) {
+    pieceSizeWarning.textContent = "";
+    return;
+  }
+
+  const factor = unitSelect.value === "Inches" ? 25.4 : 1;
+  const widthMM = w * factor;
+  const heightMM = h * factor;
+  const pieceW = widthMM / cols;
+  const pieceH = heightMM / rows;
+  const minDim = Math.min(pieceW, pieceH);
+
+  if (minDim < 10) {
+    const display = minDim < 1 ? minDim.toFixed(1) : String(Math.round(minDim));
+    pieceSizeWarning.textContent = `Pieces are very small (~${display}mm). May be difficult to cut/handle.`;
+  } else {
+    pieceSizeWarning.textContent = "";
+  }
+}
+
 // ─── Main ───────────────────────────────────────────────────
 
 async function main(): Promise<void> {
@@ -412,8 +485,11 @@ async function main(): Promise<void> {
   taperRandomize = document.getElementById("taper-randomize") as HTMLInputElement;
   taperMaxSlider = document.getElementById("taper-max") as HTMLInputElement;
 
-  rulerWidth = document.getElementById("ruler-width")!;
-  rulerHeight = document.getElementById("ruler-height")!;
+    pieceTargetInput = document.getElementById("piece-target") as HTMLInputElement;
+    pieceSizeWarning = document.getElementById("piece-size-warning")!;
+
+    rulerWidth = document.getElementById("ruler-width")!;
+    rulerHeight = document.getElementById("ruler-height")!;
   svgViewport = document.getElementById("svg-viewport")!;
   zoomLevelDisplay = document.getElementById("zoom-level")!;
   zoomInBtn = document.getElementById("zoom-in")!;
@@ -435,15 +511,30 @@ async function main(): Promise<void> {
 
   // ─── Event Wiring ───────────────────────────────────────
 
-  // Number inputs — instant regeneration + recalculate tab max
-  const numberInputs = [rowsInput, colsInput, widthInput, heightInput];
-  for (const input of numberInputs) {
-    input.addEventListener("input", () => {
-      updateTabMax();
-      updateReadouts();
-      generatePuzzle();
+    // Number inputs — instant regeneration + recalculate tab max
+    const numberInputs = [rowsInput, colsInput, widthInput, heightInput];
+    for (const input of numberInputs) {
+      input.addEventListener("input", () => {
+        updateTabMax();
+        updateReadouts();
+        generatePuzzle();
+        // Sync piece count when rows/cols change; check piece size on any dimension change
+        if (input === rowsInput || input === colsInput) {
+          syncPieceCount();
+        }
+        checkPieceSize();
+      });
+    }
+
+    // Piece count input — auto-calculate best grid
+    pieceTargetInput.addEventListener("input", () => {
+      const target = parseInt(pieceTargetInput.value, 10);
+      if (!isNaN(target) && target >= 4) {
+        calcBestGrid(target);
+        syncPieceCount(); // Update to show actual total (may differ from target)
+        checkPieceSize();
+      }
     });
-  }
 
   // Range sliders — update readout + regenerate
   const sliders = [tabSlider, taperSlider, radiusSlider];
@@ -481,14 +572,15 @@ async function main(): Promise<void> {
     toggleRandomize(taperRandomize, taperMaxSlider, taperSlider);
   });
 
-  // Unit select — convert dimensions and recalculate tab max
-  unitSelect.addEventListener("change", () => {
-    const newUnit = unitSelect.value;
-    convertDimensions(previousUnit, newUnit);
-    previousUnit = newUnit;
-    updateTabMax();
-    generatePuzzle();
-  });
+    // Unit select — convert dimensions and recalculate tab max
+    unitSelect.addEventListener("change", () => {
+      const newUnit = unitSelect.value;
+      convertDimensions(previousUnit, newUnit);
+      previousUnit = newUnit;
+      updateTabMax();
+      generatePuzzle();
+      checkPieceSize();
+    });
 
   // Seed text input
   seedInput.addEventListener("input", generatePuzzle);
@@ -690,10 +782,12 @@ async function main(): Promise<void> {
     }
   });
 
-  // ─── Initial Generate ─────────────────────────────────────
+    // ─── Initial Generate ─────────────────────────────────────
 
-  generatePuzzle();
-  resetZoom(); // Center vertically on first load
+    syncPieceCount(); // Populate piece count from current rows * cols
+    checkPieceSize(); // Check initial piece dimensions
+    generatePuzzle();
+    resetZoom(); // Center vertically on first load
 }
 
 main();
