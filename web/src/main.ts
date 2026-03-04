@@ -51,7 +51,7 @@ function buildConfig(): object {
     width: parseFloat(widthInput.value),
     height: parseFloat(heightInput.value),
     unit: unitSelect.value,
-    tab: { size_pct: parseFloat(tabSlider.value), taper: parseFloat(taperSlider.value) },
+    tab: { size_pct: parseFloat(tabSlider.value), taper: 0.5 + parseFloat(taperSlider.value) * 0.7 },
     border: { corner_radius: parseFloat(radiusSlider.value) },
     seed: seedInput.value,
     kerf_width: parseFloat(kerfSlider.value),
@@ -72,8 +72,8 @@ function loadFromURL(): boolean {
   const unit = unitParam === "in" ? "Inches" : "Millimeters";
   const tab = parseInt(params.get("tab") ?? "25", 10) / 100;
   const radius = parseFloat(params.get("radius") ?? "2");
-  const taperRaw = parseInt(params.get("taper") ?? "50", 10) / 100;
-  const taper = Math.max(0.30, Math.min(1.10, taperRaw)); // clamp to valid range
+  const taperUser = parseInt(params.get("taper") ?? "0", 10) / 100;
+  const taper = Math.max(0, Math.min(1, taperUser));
   const kerf = parseFloat(params.get("kerf") ?? "0");
   const seed = params.get("seed") ?? "";
 
@@ -102,7 +102,7 @@ function updateURL(): void {
   params.set("h", String(config.height));
   params.set("unit", config.unit === "Inches" ? "in" : "mm");
   params.set("tab", String(Math.round(tabObj.size_pct * 100)));
-  params.set("taper", String(Math.round(tabObj.taper * 100)));
+  params.set("taper", String(Math.round(parseFloat(taperSlider.value) * 100)));
   params.set("radius", String(borderObj.corner_radius));
   params.set("kerf", String(config.kerf_width));
   params.set("seed", String(config.seed));
