@@ -1,5 +1,4 @@
 use kurbo::{CubicBez, ParamCurveExtrema, Point};
-use rand::RngExt;
 use rand_chacha::ChaCha8Rng;
 
 use crate::connector::ConnectorGenerator;
@@ -13,9 +12,6 @@ const KNOB_HEIGHT_RATIO: f64 = 1.2;
 
 /// Neck height as a fraction of knob height (how tall the neck is before widening).
 const NECK_HEIGHT_RATIO: f64 = 0.35;
-
-/// Range of center jitter as a fraction of edge length (scaled by jitter_amount).
-const CENTER_JITTER_RANGE: f64 = 0.05;
 
 /// How far beyond the knob top the control points overshoot (creates rounded top).
 const TOP_OVERSHOOT: f64 = 1.05;
@@ -45,7 +41,7 @@ const TOP_WIDTH_RATIO: f64 = 0.1;
 ///
 /// ```text
 /// Edge baseline: y=0, x from 0 to length
-/// Knob center: x ≈ length/2 (+ jitter), y = knob_h
+/// Knob center: x = length/2, y = knob_h
 ///
 ///   [flat]──[neck-in]──[body-out]──[top-round]──[body-out]──[neck-in]──[flat]
 ///            narrowing   widening    rounded top   narrowing
@@ -62,9 +58,8 @@ const TOP_WIDTH_RATIO: f64 = 0.1;
 pub struct ClassicKnobConnector;
 
 impl ConnectorGenerator for ClassicKnobConnector {
-    fn generate(&self, params: &EdgeParams, rng: &mut ChaCha8Rng) -> Vec<CubicBez> {
+    fn generate(&self, params: &EdgeParams, _rng: &mut ChaCha8Rng) -> Vec<CubicBez> {
         let length = params.length;
-        let jitter = params.jitter_amount;
 
         // Direction sign: +1.0 for Out (knob extends in +Y), -1.0 for In
         let dir_sign = match params.direction {
@@ -72,10 +67,8 @@ impl ConnectorGenerator for ClassicKnobConnector {
             TabDirection::In => -1.0,
         };
 
-        // Compute center offset with jitter
-        let center_jitter =
-            jitter * rng.random_range(-CENTER_JITTER_RANGE..CENTER_JITTER_RANGE) * length;
-        let center = length * 0.5 + center_jitter;
+        // Knob is always centered on the edge
+        let center = length * 0.5;
 
         // Knob dimensions
         let knob_w = length * params.tab_size;
@@ -193,7 +186,6 @@ mod tests {
             length: 50.0,
             direction,
             tab_size: 0.25,
-            jitter_amount: 0.5,
             neck_ratio: 0.75,
         }
     }
@@ -307,90 +299,52 @@ mod tests {
         );
     }
 
-    // ─── Variation Tests ──────────────────────────────────────────
+    // ─── Center Tests ─────────────────────────────────────────────
 
     #[test]
-    fn test_jitter_shifts_center_position() {
+    fn test_knob_centered_on_edge() {
         let connector = ClassicKnobConnector;
         let params = default_params(TabDirection::Out);
-
-        let mut rng1 = create_rng("jitter-a");
-        let curves1 = connector.generate(&params, &mut rng1);
-
-        let mut rng2 = create_rng("jitter-b");
-        let curves2 = connector.generate(&params, &mut rng2);
-
-        assert!(!curves1.is_empty() && !curves2.is_empty(), "need curves");
-
-        // Jitter shifts the knob center along the edge (x-axis).
-        // The knob top (segment 2, index 2) midpoint x should differ.
-        let mid_x_1 = (curves1[2].p0.x + curves1[2].p3.x) / 2.0;
-        let mid_x_2 = (curves2[2].p0.x + curves2[2].p3.x) / 2.0;
-        assert!(
-            (mid_x_1 - mid_x_2).abs() > 1e-10,
-            "Different RNG seeds should shift knob center: {} vs {}",
-            mid_x_1,
-            mid_x_2
-        );
-    }
-
-    #[test]
-    fn test_jitter_does_not_change_knob_shape() {
-        let connector = ClassicKnobConnector;
-        let params = default_params(TabDirection::Out);
-
-        let mut rng1 = create_rng("shape-a");
-        let curves1 = connector.generate(&params, &mut rng1);
-
-        let mut rng2 = create_rng("shape-b");
-        let curves2 = connector.generate(&params, &mut rng2);
-
-        // Compute center of each knob from the top segment midpoint
-        let center1 = (curves1[2].p0.x + curves1[2].p3.x) / 2.0;
-        let center2 = (curves2[2].p0.x + curves2[2].p3.x) / 2.0;
-        let dx = center2 - center1;
-
-        // After shifting curves2 by -dx, all points should match
-        // (jitter only moves the knob, doesn't change its shape)
-        for (c1, c2) in curves1.iter().zip(curves2.iter()).skip(1).take(3) {
-            // Check segments 1-3 (the knob itself, not the approach segments)
-            assert!(
-                (c1.p0.y - c2.p0.y).abs() < 1e-10,
-                "y-coords should match (shape unchanged by jitter)"
-            );
-            assert!(
-                ((c1.p0.x + dx) - c2.p0.x).abs() < 1e-6,
-                "x-coords should match after center shift"
-            );
-        }
-    }
-
-    #[test]
-    fn test_zero_jitter_deterministic() {
-        let connector = ClassicKnobConnector;
-        let params = EdgeParams {
-            length: 50.0,
-            direction: TabDirection::Out,
-            tab_size: 0.25,
-            jitter_amount: 0.0,
-            neck_ratio: 0.75,
-        };
-
-        let mut rng = create_rng("zero-jitter");
+        let mut rng = create_rng("center-test");
         let curves = connector.generate(&params, &mut rng);
         assert!(!curves.is_empty(), "need curves");
 
-        // With zero jitter, knob center should be at exactly length/2
-        // Check: the midpoint of all curves' x range should be centered
-        // More specifically: the 3rd curve (knob top) should be centered at length/2
+        // Knob top (segment 2) should be centered at length/2
         let mid_curve = &curves[curves.len() / 2];
         let mid_x = (mid_curve.p0.x + mid_curve.p3.x) / 2.0;
         assert!(
             (mid_x - params.length / 2.0).abs() < 1e-6,
-            "with zero jitter, knob center x should be at {}, got {}",
+            "knob center x should be at {}, got {}",
             params.length / 2.0,
             mid_x
         );
+    }
+
+    #[test]
+    fn test_identical_shape_across_seeds() {
+        let connector = ClassicKnobConnector;
+        let params = default_params(TabDirection::Out);
+
+        let mut rng1 = create_rng("seed-a");
+        let curves1 = connector.generate(&params, &mut rng1);
+
+        let mut rng2 = create_rng("seed-b");
+        let curves2 = connector.generate(&params, &mut rng2);
+
+        // Same params → identical curves regardless of RNG seed
+        for (c1, c2) in curves1.iter().zip(curves2.iter()) {
+            assert!(
+                (c1.p0.x - c2.p0.x).abs() < 1e-10
+                    && (c1.p0.y - c2.p0.y).abs() < 1e-10
+                    && (c1.p1.x - c2.p1.x).abs() < 1e-10
+                    && (c1.p1.y - c2.p1.y).abs() < 1e-10
+                    && (c1.p2.x - c2.p2.x).abs() < 1e-10
+                    && (c1.p2.y - c2.p2.y).abs() < 1e-10
+                    && (c1.p3.x - c2.p3.x).abs() < 1e-10
+                    && (c1.p3.y - c2.p3.y).abs() < 1e-10,
+                "curves should be identical regardless of RNG seed"
+            );
+        }
     }
 
     // ─── Proportion Tests ─────────────────────────────────────────
@@ -403,7 +357,6 @@ mod tests {
             length: 50.0,
             direction: TabDirection::Out,
             tab_size: 0.15,
-            jitter_amount: 0.0,
             neck_ratio: 0.75,
         };
 
@@ -411,7 +364,6 @@ mod tests {
             length: 50.0,
             direction: TabDirection::Out,
             tab_size: 0.45,
-            jitter_amount: 0.0,
             neck_ratio: 0.75,
         };
 
@@ -466,7 +418,6 @@ mod tests {
             length: 50.0,
             direction: TabDirection::Out,
             tab_size: 0.25,
-            jitter_amount: 0.0,
             neck_ratio: 0.75,
         };
         let mut rng = create_rng("neck-test");

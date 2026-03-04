@@ -30,7 +30,6 @@ let heightInput: HTMLInputElement;
 let unitSelect: HTMLSelectElement;
 let tabSlider: HTMLInputElement;
 let taperSlider: HTMLInputElement;
-let jitterSlider: HTMLInputElement;
 let radiusSlider: HTMLInputElement;
 let kerfSlider: HTMLInputElement;
 let seedInput: HTMLInputElement;
@@ -40,7 +39,6 @@ let errorDisplay: HTMLElement;
 
 let tabReadout: HTMLElement;
 let taperReadout: HTMLElement;
-let jitterReadout: HTMLElement;
 let radiusReadout: HTMLElement;
 let kerfReadout: HTMLElement;
 
@@ -54,7 +52,6 @@ function buildConfig(): object {
     height: parseFloat(heightInput.value),
     unit: unitSelect.value,
     tab: { size_pct: parseFloat(tabSlider.value), taper: parseFloat(taperSlider.value) },
-    jitter: { amount: parseFloat(jitterSlider.value) },
     border: { corner_radius: parseFloat(radiusSlider.value) },
     seed: seedInput.value,
     kerf_width: parseFloat(kerfSlider.value),
@@ -74,7 +71,6 @@ function loadFromURL(): boolean {
   const unitParam = params.get("unit") ?? "mm";
   const unit = unitParam === "in" ? "Inches" : "Millimeters";
   const tab = parseInt(params.get("tab") ?? "25", 10) / 100;
-  const jitter = parseInt(params.get("jitter") ?? "50", 10) / 100;
   const radius = parseFloat(params.get("radius") ?? "2");
   const taper = parseInt(params.get("taper") ?? "50", 10) / 100; // 50 → 0.5
   const kerf = parseFloat(params.get("kerf") ?? "0");
@@ -87,7 +83,6 @@ function loadFromURL(): boolean {
   unitSelect.value = unit;
   tabSlider.value = String(tab);
   taperSlider.value = String(taper);
-  jitterSlider.value = String(jitter);
   radiusSlider.value = String(radius);
   kerfSlider.value = String(kerf);
   seedInput.value = seed || randomSeed();
@@ -98,7 +93,6 @@ function loadFromURL(): boolean {
 function updateURL(): void {
   const config = buildConfig() as Record<string, unknown>;
   const tabObj = config.tab as { size_pct: number; taper: number };
-  const jitterObj = config.jitter as { amount: number };
   const borderObj = config.border as { corner_radius: number };
   const params = new URLSearchParams();
   params.set("rows", String(config.rows));
@@ -108,7 +102,6 @@ function updateURL(): void {
   params.set("unit", config.unit === "Inches" ? "in" : "mm");
   params.set("tab", String(Math.round(tabObj.size_pct * 100)));
   params.set("taper", String(Math.round(tabObj.taper * 100)));
-  params.set("jitter", String(Math.round(jitterObj.amount * 100)));
   params.set("radius", String(borderObj.corner_radius));
   params.set("kerf", String(config.kerf_width));
   params.set("seed", String(config.seed));
@@ -178,7 +171,6 @@ function generatePuzzle(): void {
 function updateReadouts(): void {
   tabReadout.textContent = `${Math.round(parseFloat(tabSlider.value) * 100)}%`;
   taperReadout.textContent = parseFloat(taperSlider.value).toFixed(2);
-  jitterReadout.textContent = parseFloat(jitterSlider.value).toFixed(2);
   radiusReadout.textContent = parseFloat(radiusSlider.value).toFixed(1);
   kerfReadout.textContent = parseFloat(kerfSlider.value).toFixed(2);
 }
@@ -209,7 +201,6 @@ async function main(): Promise<void> {
   unitSelect = document.getElementById("unit") as HTMLSelectElement;
   tabSlider = document.getElementById("tab") as HTMLInputElement;
   taperSlider = document.getElementById("taper") as HTMLInputElement;
-  jitterSlider = document.getElementById("jitter") as HTMLInputElement;
   radiusSlider = document.getElementById("radius") as HTMLInputElement;
   kerfSlider = document.getElementById("kerf") as HTMLInputElement;
   seedInput = document.getElementById("seed") as HTMLInputElement;
@@ -219,7 +210,6 @@ async function main(): Promise<void> {
 
   tabReadout = document.getElementById("tab-readout")!;
   taperReadout = document.getElementById("taper-readout")!;
-  jitterReadout = document.getElementById("jitter-readout")!;
   radiusReadout = document.getElementById("radius-readout")!;
   kerfReadout = document.getElementById("kerf-readout")!;
 
@@ -246,7 +236,7 @@ async function main(): Promise<void> {
   }
 
   // Range sliders — update readout + regenerate
-  const sliders = [tabSlider, taperSlider, jitterSlider, radiusSlider, kerfSlider];
+  const sliders = [tabSlider, taperSlider, radiusSlider, kerfSlider];
   for (const slider of sliders) {
     slider.addEventListener("input", () => {
       updateReadouts();

@@ -80,33 +80,6 @@ impl TabConfig {
     }
 }
 
-/// Jitter/randomness configuration for edge variation.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct JitterConfig {
-    /// Jitter amount as a fraction (0.0..=1.0, default 0.5).
-    /// 0.0 = all connectors identical, 1.0 = maximum variation.
-    pub amount: f64,
-}
-
-impl Default for JitterConfig {
-    fn default() -> Self {
-        Self { amount: 0.5 }
-    }
-}
-
-impl JitterConfig {
-    /// Validate that jitter amount is within acceptable bounds.
-    pub fn validate(&self) -> Result<(), String> {
-        if self.amount < 0.0 || self.amount > 1.0 {
-            return Err(format!(
-                "jitter amount must be between 0.0 and 1.0, got {}",
-                self.amount
-            ));
-        }
-        Ok(())
-    }
-}
-
 /// Border configuration for the puzzle outline.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BorderConfig {
@@ -153,8 +126,6 @@ pub struct PuzzleConfig {
     pub unit: Unit,
     /// Tab/knob configuration.
     pub tab: TabConfig,
-    /// Jitter/randomness configuration.
-    pub jitter: JitterConfig,
     /// Border configuration.
     pub border: BorderConfig,
     /// User seed string (empty = auto-generate).
@@ -175,7 +146,6 @@ impl Default for PuzzleConfig {
             height: 210.0,
             unit: Unit::Millimeters,
             tab: TabConfig::default(),
-            jitter: JitterConfig::default(),
             border: BorderConfig::default(),
             seed: String::new(),
             kerf_width: 0.0,
@@ -207,7 +177,6 @@ impl PuzzleConfig {
             ));
         }
         self.tab.validate()?;
-        self.jitter.validate()?;
         self.border.validate()?;
         Ok(())
     }
@@ -223,7 +192,6 @@ impl PuzzleConfig {
         height: f64,
         unit: Unit,
         tab: TabConfig,
-        jitter: JitterConfig,
         border: BorderConfig,
         seed: String,
         kerf_width: f64,
@@ -235,7 +203,6 @@ impl PuzzleConfig {
             height: unit.to_mm(height),
             unit,
             tab,
-            jitter,
             border,
             seed,
             kerf_width,
@@ -337,20 +304,6 @@ mod tests {
     }
 
     #[test]
-    fn test_validate_jitter_negative() {
-        let mut config = PuzzleConfig::default();
-        config.jitter.amount = -0.1;
-        assert!(config.validate().is_err());
-    }
-
-    #[test]
-    fn test_validate_jitter_over_one() {
-        let mut config = PuzzleConfig::default();
-        config.jitter.amount = 1.1;
-        assert!(config.validate().is_err());
-    }
-
-    #[test]
     fn test_validate_border_negative() {
         let mut config = PuzzleConfig::default();
         config.border.corner_radius = -1.0;
@@ -373,7 +326,6 @@ mod tests {
             8.0,
             Unit::Inches,
             TabConfig::default(),
-            JitterConfig::default(),
             BorderConfig::default(),
             "test".to_string(),
             0.0,
@@ -393,7 +345,6 @@ mod tests {
             150.0,
             Unit::Millimeters,
             TabConfig::default(),
-            JitterConfig::default(),
             BorderConfig::default(),
             String::new(),
             0.0,
@@ -413,7 +364,6 @@ mod tests {
             150.0,
             Unit::Millimeters,
             TabConfig::default(),
-            JitterConfig::default(),
             BorderConfig::default(),
             String::new(),
             0.0,
@@ -434,7 +384,6 @@ mod tests {
                 size_pct: 0.15,
                 taper: 0.5,
             },
-            JitterConfig { amount: 0.0 },
             BorderConfig { corner_radius: 0.0 },
             String::new(),
             0.0,
@@ -452,7 +401,25 @@ mod tests {
                 size_pct: 0.45,
                 taper: 1.0,
             },
-            JitterConfig { amount: 1.0 },
+            BorderConfig {
+                corner_radius: 10.0,
+            },
+            String::new(),
+            1.0,
+        );
+        assert!(config.is_ok());
+
+        // Maximum valid config
+        let config = PuzzleConfig::from_input(
+            100,
+            100,
+            1000.0,
+            1000.0,
+            Unit::Millimeters,
+            TabConfig {
+                size_pct: 0.45,
+                taper: 1.0,
+            },
             BorderConfig {
                 corner_radius: 10.0,
             },
