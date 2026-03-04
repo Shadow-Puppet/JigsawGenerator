@@ -83,6 +83,7 @@ Phase 4 [x] Web GUI & Live Preview (2/2 plans)
 - Taper range adjusted to 0.30..=1.10; old URL params clamped for backward compat (quick-001)
 - Taper slider normalized to 0-1 user-facing range with linear interpolation to internal 0.5-1.2 (quick-002)
 - Max tab size capped at 25% (was 45%) to prevent oversized/overlapping connectors (quick-003)
+- safe_tab_max() must clamp inputs before validation — otherwise out-of-range slider values cause validation failure, silently preventing max updates (quick-004)
 
 ### Research Flags
 - **Phase 3 (Connectors):** Complete. Connector generation + SVG export pipeline fully functional.
@@ -109,13 +110,14 @@ Phase 4 [x] Web GUI & Live Preview (2/2 plans)
 | 001 | Adjust taper range - make .30 the minimum and increase maximum by 10% | 2026-03-04 | 90325ae | [001-adjust-taper-range-make-30-the-minimum-a](./quick/001-adjust-taper-range-make-30-the-minimum-a/) |
 | 002 | Change taper range to 0-1 (user) / 0.5-1.2 (internal) | 2026-03-04 | 31e6755 | [002-change-taper-range-to-0-5-1-2-internally](./quick/002-change-taper-range-to-0-5-1-2-internally/) |
 | 003 | Set the max tab size to 25% | 2026-03-04 | ec0f42a | [3-set-the-max-tab-size-to-25](./quick/3-set-the-max-tab-size-to-25/) |
+| 004 | Rebuild WASM and fix safe_tab_max validation chicken-and-egg bug | 2026-03-04 | 2e1ce8e | [4-rebuild-wasm-and-fix-safe-tab-max-valida](./quick/4-rebuild-wasm-and-fix-safe-tab-max-valida/) |
 
 ## Session Continuity
 
-**Last session:** 2026-03-04T15:51:00Z
-**Stopped at:** Completed quick task 003: set max tab size to 25%
-**Next action:** Milestone complete — all 4 phases done, quick-001/002/003 applied
+**Last session:** 2026-03-04T16:11:00Z
+**Stopped at:** Completed quick task 004: fix safe_tab_max validation bug and rebuild WASM
+**Next action:** Milestone complete — all 4 phases done, quick-001/002/003/004 applied
 
 ---
-Last activity: 2026-03-04 - Completed quick task 003: set max tab size to 25%
-*Last updated: 2026-03-04T15:51:00Z*
+Last activity: 2026-03-04 - Completed quick task 004: Rebuild WASM and fix safe_tab_max validation bug
+*Last updated: 2026-03-04T16:11:00Z*
