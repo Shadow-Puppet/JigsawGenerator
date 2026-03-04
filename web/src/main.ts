@@ -479,14 +479,160 @@ async function main(): Promise<void> {
     generatePuzzle();
   });
 
+  // ─── Zoom/Pan Event Wiring ──────────────────────────────
+
+  // Wheel zoom — zoom toward cursor position
+  svgViewport.addEventListener(
+    "wheel",
+    (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = svgViewport.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      const oldZoom = zoomLevel;
+      if (e.deltaY < 0) {
+        zoomLevel = Math.min(MAX_ZOOM, zoomLevel * ZOOM_STEP);
+      } else {
+        zoomLevel = Math.max(MIN_ZOOM, zoomLevel / ZOOM_STEP);
+      }
+
+      // Adjust pan so zoom centers on cursor
+      const zoomRatio = zoomLevel / oldZoom;
+      panX = mouseX - zoomRatio * (mouseX - panX);
+      panY = mouseY - zoomRatio * (mouseY - panY);
+
+      applyTransform();
+    },
+    { passive: false },
+  );
+
+  // Mouse drag pan
+  svgViewport.addEventListener("mousedown", (e: MouseEvent) => {
+    if (e.button !== 0) return; // left click only
+    isPanning = true;
+    panStartX = e.clientX - panX;
+    panStartY = e.clientY - panY;
+    e.preventDefault();
+  });
+
+  window.addEventListener("mousemove", (e: MouseEvent) => {
+    if (!isPanning) return;
+    panX = e.clientX - panStartX;
+    panY = e.clientY - panStartY;
+    applyTransform();
+  });
+
+  window.addEventListener("mouseup", () => {
+    isPanning = false;
+  });
+
+  // Double-click to reset zoom
+  svgViewport.addEventListener("dblclick", () => {
+    resetZoom();
+  });
+
+  // Zoom button handlers
+  zoomInBtn.addEventListener("click", () => {
+    const rect = svgViewport.getBoundingClientRect();
+    const cx = rect.width / 2;
+    const cy = rect.height / 2;
+    const oldZoom = zoomLevel;
+    zoomLevel = Math.min(MAX_ZOOM, zoomLevel * ZOOM_STEP);
+    const zoomRatio = zoomLevel / oldZoom;
+    panX = cx - zoomRatio * (cx - panX);
+    panY = cy - zoomRatio * (cy - panY);
+    applyTransform();
+  });
+
+  zoomOutBtn.addEventListener("click", () => {
+    const rect = svgViewport.getBoundingClientRect();
+    const cx = rect.width / 2;
+    const cy = rect.height / 2;
+    const oldZoom = zoomLevel;
+    zoomLevel = Math.max(MIN_ZOOM, zoomLevel / ZOOM_STEP);
+    const zoomRatio = zoomLevel / oldZoom;
+    panX = cx - zoomRatio * (cx - panX);
+    panY = cy - zoomRatio * (cy - panY);
+    applyTransform();
+  });
+
+  zoomResetBtn.addEventListener("click", () => {
+    resetZoom();
+  });
+
+  // Touch support — pinch zoom and drag
+  let lastTouchDist = 0;
+
+  svgViewport.addEventListener(
+    "touchstart",
+    (e: TouchEvent) => {
+      if (e.touches.length === 1) {
+        isPanning = true;
+        panStartX = e.touches[0].clientX - panX;
+        panStartY = e.touches[0].clientY - panY;
+      } else if (e.touches.length === 2) {
+        isPanning = false;
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        lastTouchDist = Math.sqrt(dx * dx + dy * dy);
+      }
+    },
+    { passive: true },
+  );
+
+  svgViewport.addEventListener(
+    "touchmove",
+    (e: TouchEvent) => {
+      e.preventDefault();
+      if (e.touches.length === 1 && isPanning) {
+        panX = e.touches[0].clientX - panStartX;
+        panY = e.touches[0].clientY - panStartY;
+        applyTransform();
+      } else if (e.touches.length === 2) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+        const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        const rect = svgViewport.getBoundingClientRect();
+
+        if (lastTouchDist > 0) {
+          const oldZoom = zoomLevel;
+          zoomLevel = Math.max(
+            MIN_ZOOM,
+            Math.min(MAX_ZOOM, zoomLevel * (dist / lastTouchDist)),
+          );
+          const zoomRatio = zoomLevel / oldZoom;
+          const cx = midX - rect.left;
+          const cy = midY - rect.top;
+          panX = cx - zoomRatio * (cx - panX);
+          panY = cy - zoomRatio * (cy - panY);
+          applyTransform();
+        }
+
+        lastTouchDist = dist;
+      }
+    },
+    { passive: false },
+  );
+
+  svgViewport.addEventListener("touchend", () => {
+    isPanning = false;
+    lastTouchDist = 0;
+  });
+
   // ─── Download SVG ──────────────────────────────────────
 
   const downloadBtn = document.getElementById("download")!;
   downloadBtn.addEventListener("click", () => {
-    const svgContent = svgContainer.innerHTML;
-    if (!svgContent) return;
-    const config = buildConfig() as Record<string, unknown>;
-    const filename = `puzzle-${config.rows}x${config.cols}-seed-${config.seed}.svg`;
+    // Re-generate SVG for download (with original physical dimensions from WASM)
+    const config = buildConfig();
+    const configJson = JSON.stringify(config);
+    const svgContent = generate_svg(configJson);
+    if (!svgContent.startsWith("<svg")) return;
+    const configObj = config as Record<string, unknown>;
+    const filename = `puzzle-${configObj.rows}x${configObj.cols}-seed-${configObj.seed}.svg`;
     const blob = new Blob([svgContent], { type: "image/svg+xml" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
