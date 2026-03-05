@@ -93,6 +93,8 @@ Phase 4 [x] Web GUI & Live Preview (2/2 plans)
 - Piece size warning at <10mm threshold, visible but non-blocking (quick-010)
 - cross_length field in EdgeParams; knob base = min(length, cross_length) for uniform sizing across axes (quick-011)
 - safe_tab_max floor removed — no .max(0.15), prevents forced overlap at extreme aspect ratios (quick-011)
+- enforceConstraints(source) replaces checkPieceSize(); auto-adjusts unlocked section, shows warnings when locked (quick-012)
+- Lock/unlock toggles on Grid Size and Dimensions headers; unlocked = auto-adjust, locked = warning mode (quick-012)
 
 ### Research Flags
 - **Phase 3 (Connectors):** Complete. Connector generation + SVG export pipeline fully functional.
@@ -127,13 +129,14 @@ Phase 4 [x] Web GUI & Live Preview (2/2 plans)
 | 009 | Remove kerf width feature entirely | 2026-03-04 | efb9242 | [9-remove-kerf-width-feature-entirely-delet](./quick/9-remove-kerf-width-feature-entirely-delet/) |
 | 010 | Add piece count input with auto row/col calculation | 2026-03-04 | c559db3 | [10-add-piece-count-input-with-auto-row-col-](./quick/10-add-piece-count-input-with-auto-row-col-/) |
 | 011 | Fix vertical axis knob scaling to match horizontal | 2026-03-05 | d69e29e | [11-fix-vertical-axis-knob-scaling-to-match-](./quick/11-fix-vertical-axis-knob-scaling-to-match-/) |
+| 012 | Auto-adjust dimensions/grid to prevent warnings with lock/unlock toggles | 2026-03-05 | fac44e9 | [12-auto-adjust-dimensions-grid-to-prevent-w](./quick/12-auto-adjust-dimensions-grid-to-prevent-w/) |
 
 ## Session Continuity
 
-**Last session:** 2026-03-05T01:57:00Z
-**Stopped at:** Completed quick task 011: Fix vertical axis knob scaling to match horizontal
-**Next action:** Milestone complete — all 4 phases done, quick-001 through 011 applied
+**Last session:** 2026-03-05T03:17:00Z
+**Stopped at:** Completed quick task 012: Auto-adjust dimensions/grid to prevent warnings with lock/unlock toggles
+**Next action:** Milestone complete — all 4 phases done, quick-001 through 012 applied
 
 ---
-Last activity: 2026-03-05 - Completed quick task 011: Fix vertical axis knob scaling to match horizontal
-*Last updated: 2026-03-05T01:57:00Z*
+Last activity: 2026-03-05 - Completed quick task 012: Auto-adjust dimensions/grid to prevent warnings with lock/unlock toggles
+*Last updated: 2026-03-05T03:17:00Z*
