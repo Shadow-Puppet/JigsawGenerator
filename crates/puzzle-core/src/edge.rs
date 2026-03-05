@@ -44,6 +44,9 @@ impl Edge {
 pub struct EdgeParams {
     /// Edge length in mm.
     pub length: f64,
+    /// Perpendicular cell dimension in mm (cell_h for h-edges, cell_w for v-edges).
+    /// Used with `length` to compute uniform knob sizing via `min(length, cross_length)`.
+    pub cross_length: f64,
     /// Tab direction (In or Out).
     pub direction: TabDirection,
     /// Tab size as a fraction of edge length (0.15..=0.45, dynamically clamped).

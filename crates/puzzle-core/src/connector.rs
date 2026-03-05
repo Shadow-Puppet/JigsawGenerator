@@ -53,6 +53,7 @@ mod tests {
         let connector = NullConnector;
         let params = EdgeParams {
             length: 50.0,
+            cross_length: 50.0,
             direction: TabDirection::Out,
             tab_size: 0.25,
             neck_ratio: 0.75,
@@ -67,6 +68,7 @@ mod tests {
         let connector = NullConnector;
         let params = EdgeParams {
             length: 50.0,
+            cross_length: 50.0,
             direction: TabDirection::In,
             tab_size: 0.25,
             neck_ratio: 0.75,
@@ -81,6 +83,7 @@ mod tests {
         let connector: Box<dyn ConnectorGenerator> = Box::new(NullConnector);
         let params = EdgeParams {
             length: 30.0,
+            cross_length: 30.0,
             direction: TabDirection::Out,
             tab_size: 0.30,
             neck_ratio: 0.75,

@@ -184,6 +184,7 @@ mod tests {
     fn default_params(direction: TabDirection) -> EdgeParams {
         EdgeParams {
             length: 50.0,
+            cross_length: 50.0,
             direction,
             tab_size: 0.25,
             neck_ratio: 0.75,
@@ -355,6 +356,7 @@ mod tests {
 
         let small_params = EdgeParams {
             length: 50.0,
+            cross_length: 50.0,
             direction: TabDirection::Out,
             tab_size: 0.15,
             neck_ratio: 0.75,
@@ -362,6 +364,7 @@ mod tests {
 
         let large_params = EdgeParams {
             length: 50.0,
+            cross_length: 50.0,
             direction: TabDirection::Out,
             tab_size: 0.25,
             neck_ratio: 0.75,
@@ -416,6 +419,7 @@ mod tests {
         let connector = ClassicKnobConnector;
         let params = EdgeParams {
             length: 50.0,
+            cross_length: 50.0,
             direction: TabDirection::Out,
             tab_size: 0.25,
             neck_ratio: 0.75,

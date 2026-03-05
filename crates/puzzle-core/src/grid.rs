@@ -163,8 +163,10 @@ impl PuzzleGrid {
 
         let theoretical_max = max_h.min(max_v).min(max_approach);
 
-        // Apply 90% safety margin, floor at 0.15 (minimum valid)
-        (theoretical_max * 0.9).max(0.15).min(0.25)
+        // Apply 90% safety margin, cap at 0.25.
+        // No floor: extreme aspect ratios may need very small tabs to avoid overlap.
+        // The UI-side TabConfig validation handles the display range.
+        (theoretical_max * 0.9).min(0.25)
     }
 
     /// Populate connector geometry on all internal edges.
@@ -186,7 +188,14 @@ impl PuzzleGrid {
         // Clamp tab size to safe maximum for this grid's dimensions
         let safe_max = self.safe_tab_max();
 
+        // Compute cell dimensions for cross_length
+        let rows = self.config.rows as f64;
+        let cols = self.config.cols as f64;
+        let cell_w = self.config.width / cols;
+        let cell_h = self.config.height / rows;
+
         // Generate connectors for horizontal edges
+        // H-edges have length=cell_w, cross_length=cell_h (knobs protrude into cell height)
         for edge in &mut self.h_edges {
             if edge.is_border {
                 continue;
@@ -195,6 +204,7 @@ impl PuzzleGrid {
             let neck_ratio = self.config.tab.randomize_neck_ratio(&mut rng);
             let params = EdgeParams {
                 length: edge.length(),
+                cross_length: cell_h,
                 direction: edge.direction,
                 tab_size,
                 neck_ratio,
@@ -204,6 +214,7 @@ impl PuzzleGrid {
         }
 
         // Generate connectors for vertical edges
+        // V-edges have length=cell_h, cross_length=cell_w (knobs protrude into cell width)
         for edge in &mut self.v_edges {
             if edge.is_border {
                 continue;
@@ -212,6 +223,7 @@ impl PuzzleGrid {
             let neck_ratio = self.config.tab.randomize_neck_ratio(&mut rng);
             let params = EdgeParams {
                 length: edge.length(),
+                cross_length: cell_w,
                 direction: edge.direction,
                 tab_size,
                 neck_ratio,
