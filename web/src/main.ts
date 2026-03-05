@@ -43,9 +43,15 @@ let tabRandomize: HTMLInputElement;
 let tabMaxSlider: HTMLInputElement;
 let taperRandomize: HTMLInputElement;
 let taperMaxSlider: HTMLInputElement;
+let tabTrack: HTMLElement;
+let taperTrack: HTMLElement;
 
 let pieceTargetInput: HTMLInputElement;
 let pieceSizeWarning: HTMLElement;
+let gridLockBtn: HTMLElement;
+let dimsLockBtn: HTMLElement;
+let gridLocked = false;
+let dimsLocked = false;
 
 let rulerWidth: HTMLElement;
 let rulerHeight: HTMLElement;
@@ -203,6 +209,9 @@ function updateRuler(): void {
 function applyTransform(): void {
   svgContainer.style.transform = `translate(${panX}px, ${panY}px) scale(${zoomLevel})`;
   zoomLevelDisplay.textContent = `${Math.round(zoomLevel * 100)}%`;
+  // Keep stroke visually consistent regardless of zoom level
+  const path = svgContainer.querySelector("svg path") as SVGPathElement | null;
+  if (path) path.style.strokeWidth = `${0.2 / zoomLevel}px`;
 }
 
 function resetZoom(): void {
@@ -281,6 +290,29 @@ function generatePuzzle(): void {
   updateRuler();
 }
 
+// ─── Range Highlight ─────────────────────────────────────────
+
+function updateRangeHighlight(
+  minSlider: HTMLInputElement,
+  maxSlider: HTMLInputElement,
+  track: HTMLElement,
+  active: boolean
+): void {
+  if (!active) {
+    track.style.setProperty("--range-bg", "#ddd");
+    return;
+  }
+  const min = parseFloat(minSlider.min);
+  const max = parseFloat(minSlider.max);
+  const range = max - min || 1;
+  const leftPct = ((parseFloat(minSlider.value) - min) / range) * 100;
+  const rightPct = ((parseFloat(maxSlider.value) - min) / range) * 100;
+  track.style.setProperty(
+    "--range-bg",
+    `linear-gradient(to right, #ddd ${leftPct}%, #4a90d9 ${leftPct}%, #4a90d9 ${rightPct}%, #ddd ${rightPct}%)`
+  );
+}
+
 // ─── Readout Updaters ───────────────────────────────────────
 
 function updateReadouts(): void {
@@ -297,6 +329,8 @@ function updateReadouts(): void {
     taperReadout.textContent = parseFloat(taperSlider.value).toFixed(2);
   }
   radiusReadout.textContent = parseFloat(radiusSlider.value).toFixed(1);
+  updateRangeHighlight(tabSlider, tabMaxSlider, tabTrack, tabRandomize.checked);
+  updateRangeHighlight(taperSlider, taperMaxSlider, taperTrack, taperRandomize.checked);
 }
 
 // ─── Randomize Toggle Helpers ────────────────────────────────
@@ -391,6 +425,10 @@ function calcBestGrid(target: number): void {
   for (let r = 2; r <= maxR; r++) {
     let c = Math.round(target / r);
     c = Math.max(2, Math.min(100, c));
+    // Skip grid ratios more extreme than 1:5
+    const gridRatio = Math.max(r, c) / Math.min(r, c);
+    if (gridRatio > 5) continue;
+
     const total = r * c;
     const dist = Math.abs(total - target);
     // Piece aspect ratio: (w/c) / (h/r) — want closest to 1
@@ -420,28 +458,124 @@ function syncPieceCount(): void {
   }
 }
 
-function checkPieceSize(): void {
-  const rows = parseInt(rowsInput.value, 10);
-  const cols = parseInt(colsInput.value, 10);
-  const w = parseFloat(widthInput.value);
-  const h = parseFloat(heightInput.value);
-  if (isNaN(rows) || isNaN(cols) || isNaN(w) || isNaN(h) || rows < 1 || cols < 1) {
-    pieceSizeWarning.textContent = "";
+function toggleLock(btn: HTMLElement, currentlyLocked: boolean, label: string): boolean {
+  const next = !currentlyLocked;
+  btn.innerHTML = next ? "&#128274;" : "&#128275;";
+  btn.classList.toggle("locked", next);
+  btn.title = next ? `Unlock ${label}` : `Lock ${label}`;
+  return next;
+}
+
+function showWarnings(warnings: string[]): void {
+  pieceSizeWarning.innerHTML = warnings.map((w) => `<li>${w}</li>`).join("");
+}
+
+function enforceConstraints(source: "grid" | "dims"): void {
+  let rows = parseInt(rowsInput.value, 10);
+  let cols = parseInt(colsInput.value, 10);
+  let w = parseFloat(widthInput.value);
+  let h = parseFloat(heightInput.value);
+  if (isNaN(rows) || isNaN(cols) || isNaN(w) || isNaN(h) || rows < 2 || cols < 2 || w <= 0 || h <= 0) {
+    pieceSizeWarning.innerHTML = "";
     return;
   }
 
   const factor = unitSelect.value === "Inches" ? 25.4 : 1;
-  const widthMM = w * factor;
-  const heightMM = h * factor;
-  const pieceW = widthMM / cols;
-  const pieceH = heightMM / rows;
-  const minDim = Math.min(pieceW, pieceH);
+  const warnings: string[] = [];
+  let adjusted = false;
 
-  if (minDim < 10) {
-    const display = minDim < 1 ? minDim.toFixed(1) : String(Math.round(minDim));
-    pieceSizeWarning.textContent = `Pieces are very small (~${display}mm). May be difficult to cut/handle.`;
+  if (source === "grid") {
+    // User changed grid — adjust dimensions (if unlocked)
+    const widthMM = w * factor;
+    const heightMM = h * factor;
+    const pieceW = widthMM / cols;
+    const pieceH = heightMM / rows;
+    const minDim = Math.min(pieceW, pieceH);
+
+    if (minDim < 10) {
+      if (dimsLocked) {
+        const display = minDim < 1 ? minDim.toFixed(1) : String(Math.round(minDim));
+        warnings.push(`Pieces are very small (~${display}mm). Unlock dimensions to auto-adjust.`);
+      } else {
+        // Scale up dimensions so smallest piece = 10mm
+        const needW = cols * 10; // mm needed for width
+        const needH = rows * 10; // mm needed for height
+        const newWMM = Math.max(widthMM, needW);
+        const newHMM = Math.max(heightMM, needH);
+        const newW = newWMM / factor;
+        const newH = newHMM / factor;
+        widthInput.value = unitSelect.value === "Inches"
+          ? parseFloat(newW.toFixed(2)).toString()
+          : String(Math.round(newW));
+        heightInput.value = unitSelect.value === "Inches"
+          ? parseFloat(newH.toFixed(2)).toString()
+          : String(Math.round(newH));
+        adjusted = true;
+      }
+    }
+
+    // Grid ratio check — this is a grid problem, warn regardless
+    const gridRatio = Math.max(rows, cols) / Math.min(rows, cols);
+    if (gridRatio > 5) {
+      warnings.push(`Grid ratio ${rows}:${cols} is very extreme. Max recommended ratio is 1:5.`);
+    }
   } else {
-    pieceSizeWarning.textContent = "";
+    // User changed dimensions — adjust grid (if unlocked)
+    const widthMM = w * factor;
+    const heightMM = h * factor;
+    const pieceW = widthMM / cols;
+    const pieceH = heightMM / rows;
+    const minDim = Math.min(pieceW, pieceH);
+
+    if (minDim < 10) {
+      if (gridLocked) {
+        const display = minDim < 1 ? minDim.toFixed(1) : String(Math.round(minDim));
+        warnings.push(`Pieces are very small (~${display}mm). Unlock grid size to auto-adjust.`);
+      } else {
+        // Reduce grid so pieces >= 10mm
+        const maxCols = Math.max(2, Math.floor(widthMM / 10));
+        const maxRows = Math.max(2, Math.floor(heightMM / 10));
+        if (cols > maxCols) {
+          cols = maxCols;
+          colsInput.value = String(cols);
+          adjusted = true;
+        }
+        if (rows > maxRows) {
+          rows = maxRows;
+          rowsInput.value = String(rows);
+          adjusted = true;
+        }
+        if (adjusted) {
+          syncPieceCount();
+        }
+      }
+    }
+
+    // Grid ratio check after potential adjustment
+    const gridRatio = Math.max(rows, cols) / Math.min(rows, cols);
+    if (gridRatio > 5) {
+      if (gridLocked) {
+        warnings.push(`Grid ratio ${rows}:${cols} is very extreme. Unlock grid size to auto-adjust.`);
+      } else {
+        // Clamp the larger dimension to 5x the smaller
+        if (rows > cols) {
+          rows = Math.min(rows, cols * 5);
+          rowsInput.value = String(rows);
+        } else {
+          cols = Math.min(cols, rows * 5);
+          colsInput.value = String(cols);
+        }
+        syncPieceCount();
+        adjusted = true;
+      }
+    }
+  }
+
+  showWarnings(warnings);
+
+  if (adjusted) {
+    updateTabMax();
+    updateReadouts();
   }
 }
 
@@ -484,9 +618,13 @@ async function main(): Promise<void> {
   tabMaxSlider = document.getElementById("tab-max") as HTMLInputElement;
   taperRandomize = document.getElementById("taper-randomize") as HTMLInputElement;
   taperMaxSlider = document.getElementById("taper-max") as HTMLInputElement;
+  tabTrack = document.getElementById("tab-track")!;
+  taperTrack = document.getElementById("taper-track")!;
 
     pieceTargetInput = document.getElementById("piece-target") as HTMLInputElement;
     pieceSizeWarning = document.getElementById("piece-size-warning")!;
+    gridLockBtn = document.getElementById("grid-lock")!;
+    dimsLockBtn = document.getElementById("dims-lock")!;
 
     rulerWidth = document.getElementById("ruler-width")!;
     rulerHeight = document.getElementById("ruler-height")!;
@@ -511,18 +649,32 @@ async function main(): Promise<void> {
 
   // ─── Event Wiring ───────────────────────────────────────
 
-    // Number inputs — instant regeneration + recalculate tab max
-    const numberInputs = [rowsInput, colsInput, widthInput, heightInput];
-    for (const input of numberInputs) {
+    // Lock toggle buttons
+    gridLockBtn.addEventListener("click", () => {
+      gridLocked = toggleLock(gridLockBtn, gridLocked, "grid size");
+    });
+    dimsLockBtn.addEventListener("click", () => {
+      dimsLocked = toggleLock(dimsLockBtn, dimsLocked, "dimensions");
+    });
+
+    // Grid inputs — rows/cols changed by user
+    for (const input of [rowsInput, colsInput]) {
       input.addEventListener("input", () => {
+        syncPieceCount();
+        enforceConstraints("grid");
         updateTabMax();
         updateReadouts();
         generatePuzzle();
-        // Sync piece count when rows/cols change; check piece size on any dimension change
-        if (input === rowsInput || input === colsInput) {
-          syncPieceCount();
-        }
-        checkPieceSize();
+      });
+    }
+
+    // Dimension inputs — width/height changed by user
+    for (const input of [widthInput, heightInput]) {
+      input.addEventListener("input", () => {
+        enforceConstraints("dims");
+        updateTabMax();
+        updateReadouts();
+        generatePuzzle();
       });
     }
 
@@ -532,7 +684,7 @@ async function main(): Promise<void> {
       if (!isNaN(target) && target >= 4) {
         calcBestGrid(target);
         syncPieceCount(); // Update to show actual total (may differ from target)
-        checkPieceSize();
+        enforceConstraints("grid");
       }
     });
 
@@ -579,7 +731,7 @@ async function main(): Promise<void> {
       previousUnit = newUnit;
       updateTabMax();
       generatePuzzle();
-      checkPieceSize();
+      enforceConstraints("dims");
     });
 
   // Seed text input
@@ -785,7 +937,7 @@ async function main(): Promise<void> {
     // ─── Initial Generate ─────────────────────────────────────
 
     syncPieceCount(); // Populate piece count from current rows * cols
-    checkPieceSize(); // Check initial piece dimensions
+    enforceConstraints("grid"); // Check initial piece dimensions
     generatePuzzle();
     resetZoom(); // Center vertically on first load
 }
