@@ -1,17 +1,9 @@
 import init, {
   generate_svg,
-  compute_pieces,
   init_panic_hook,
   safe_tab_max,
 } from "puzzle-wasm";
 import "./style.css";
-
-interface PieceBreakdown {
-  total: number;
-  corners: number;
-  edges: number;
-  interior: number;
-}
 
 interface ErrorResponse {
   error: string;
@@ -69,6 +61,9 @@ let panY = 0;
 let isPanning = false;
 let panStartX = 0;
 let panStartY = 0;
+
+let rafPending = false;
+let cachedSvgPath: SVGPathElement | null = null;
 
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 20;
@@ -210,8 +205,7 @@ function applyTransform(): void {
   svgContainer.style.transform = `translate(${panX}px, ${panY}px) scale(${zoomLevel})`;
   zoomLevelDisplay.textContent = `${Math.round(zoomLevel * 100)}%`;
   // Keep stroke visually consistent regardless of zoom level
-  const path = svgContainer.querySelector("svg path") as SVGPathElement | null;
-  if (path) path.style.strokeWidth = `${0.2 / zoomLevel}px`;
+  if (cachedSvgPath) cachedSvgPath.style.strokeWidth = `${0.2 / zoomLevel}px`;
 }
 
 function resetZoom(): void {
@@ -229,6 +223,17 @@ function resetZoom(): void {
     panY = Math.max(0, (viewportH - svgH) / 2);
   }
   applyTransform();
+}
+
+// ─── Throttled Generation ────────────────────────────────────
+
+function scheduleGenerate(): void {
+  if (rafPending) return;
+  rafPending = true;
+  requestAnimationFrame(() => {
+    rafPending = false;
+    generatePuzzle();
+  });
 }
 
 // ─── SVG Generation ─────────────────────────────────────────
@@ -259,19 +264,19 @@ function generatePuzzle(): void {
       svgEl.removeAttribute("height");
     }
 
+    // Cache path element for applyTransform() (avoids DOM query per zoom/pan frame)
+    cachedSvgPath = svgEl?.querySelector("path") as SVGPathElement | null;
+
     errorDisplay.style.display = "none";
 
-    // Also get piece breakdown
-    const piecesResult = compute_pieces(configJson);
-    try {
-      const parsed: PieceBreakdown | ErrorResponse = JSON.parse(piecesResult);
-      if (!("error" in parsed)) {
-        const p = parsed as PieceBreakdown;
-        pieceCount.textContent = `${p.total} pieces (${p.corners} corner, ${p.edges} edge, ${p.interior} interior)`;
-      }
-    } catch {
-      // Ignore piece count parse errors — SVG is still valid
-    }
+    // Compute piece breakdown in JS (avoids redundant WASM roundtrip)
+    const rows = parseInt(rowsInput.value, 10);
+    const cols = parseInt(colsInput.value, 10);
+    const total = rows * cols;
+    const corners = 4;
+    const edges = 2 * (rows - 2) + 2 * (cols - 2);
+    const interior = (rows - 2) * (cols - 2);
+    pieceCount.textContent = `${total} pieces (${corners} corner, ${edges} edge, ${interior} interior)`;
   } else {
     // Error — keep previous SVG visible, show error message
     try {
@@ -359,7 +364,7 @@ function toggleRandomize(
     maxSlider.style.display = "none";
   }
   updateReadouts();
-  generatePuzzle();
+  scheduleGenerate();
 }
 
 function clampMinMax(
@@ -447,7 +452,7 @@ function calcBestGrid(target: number): void {
   colsInput.value = String(bestCols);
   updateTabMax();
   updateReadouts();
-  generatePuzzle();
+  scheduleGenerate();
 }
 
 function syncPieceCount(): void {
@@ -664,7 +669,7 @@ async function main(): Promise<void> {
         enforceConstraints("grid");
         updateTabMax();
         updateReadouts();
-        generatePuzzle();
+        scheduleGenerate();
       });
     }
 
@@ -674,7 +679,7 @@ async function main(): Promise<void> {
         enforceConstraints("dims");
         updateTabMax();
         updateReadouts();
-        generatePuzzle();
+        scheduleGenerate();
       });
     }
 
@@ -700,7 +705,7 @@ async function main(): Promise<void> {
         clampMinMax(taperSlider, taperMaxSlider);
       }
       updateReadouts();
-      generatePuzzle();
+      scheduleGenerate();
     });
   }
 
@@ -708,12 +713,12 @@ async function main(): Promise<void> {
   tabMaxSlider.addEventListener("input", () => {
     clampMaxMin(tabSlider, tabMaxSlider);
     updateReadouts();
-    generatePuzzle();
+    scheduleGenerate();
   });
   taperMaxSlider.addEventListener("input", () => {
     clampMaxMin(taperSlider, taperMaxSlider);
     updateReadouts();
-    generatePuzzle();
+    scheduleGenerate();
   });
 
   // Randomize checkboxes
@@ -735,13 +740,13 @@ async function main(): Promise<void> {
     });
 
   // Seed text input
-  seedInput.addEventListener("input", generatePuzzle);
+  seedInput.addEventListener("input", scheduleGenerate);
 
   // Randomize button
   const randomizeBtn = document.getElementById("randomize")!;
   randomizeBtn.addEventListener("click", () => {
     seedInput.value = randomSeed();
-    generatePuzzle();
+    scheduleGenerate();
   });
 
   // ─── Zoom/Pan Event Wiring ──────────────────────────────
