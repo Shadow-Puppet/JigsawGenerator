@@ -67,11 +67,13 @@ impl ConnectorGenerator for ClassicKnobConnector {
             TabDirection::In => -1.0,
         };
 
-        // Knob is always centered on the edge
+        // Knob is always centered on the actual edge
         let center = length * 0.5;
 
-        // Knob dimensions
-        let knob_w = length * params.tab_size;
+        // Knob dimensions: use min(length, cross_length) so both axes produce
+        // identically-sized knobs regardless of grid aspect ratio.
+        let base = length.min(params.cross_length);
+        let knob_w = base * params.tab_size;
         let knob_h = knob_w * KNOB_HEIGHT_RATIO * dir_sign;
         let neck_w = knob_w * params.neck_ratio;
         let neck_h = knob_h * NECK_HEIGHT_RATIO;
@@ -156,13 +158,14 @@ impl ConnectorGenerator for ClassicKnobConnector {
         }
 
         // Check bounding box doesn't exceed 5% beyond nominal piece boundary
+        // Y-axis uses cross_length since knobs protrude into the perpendicular cell dimension
         let margin = params.length * 0.05;
         for (i, curve) in curves.iter().enumerate() {
             let bbox = curve.bounding_box();
             if bbox.x0 < -margin
                 || bbox.x1 > params.length + margin
-                || bbox.y0 < -params.length - margin
-                || bbox.y1 > params.length + margin
+                || bbox.y0 < -params.cross_length - margin
+                || bbox.y1 > params.cross_length + margin
             {
                 return Err(format!(
                     "curve {} bounding box ({:?}) exceeds 5% margin",
@@ -413,6 +416,81 @@ mod tests {
     }
 
     // ─── Neck Tests ───────────────────────────────────────────────
+
+    #[test]
+    fn test_uniform_knob_size_across_axes() {
+        // Non-square grid: h-edges have length=100 (cell_w), v-edges have length=40 (cell_h)
+        // Both should produce the same knob height because min(length, cross_length) = 40 for both
+        let connector = ClassicKnobConnector;
+        let mut rng = create_rng("uniform-test");
+
+        // H-edge: length=100 (cell_w), cross_length=40 (cell_h)
+        let h_params = EdgeParams {
+            length: 100.0,
+            cross_length: 40.0,
+            direction: TabDirection::Out,
+            tab_size: 0.25,
+            neck_ratio: 0.75,
+        };
+        let h_curves = connector.generate(&h_params, &mut rng);
+
+        // V-edge: length=40 (cell_h), cross_length=100 (cell_w)
+        let v_params = EdgeParams {
+            length: 40.0,
+            cross_length: 100.0,
+            direction: TabDirection::Out,
+            tab_size: 0.25,
+            neck_ratio: 0.75,
+        };
+        let mut rng2 = create_rng("uniform-test");
+        let v_curves = connector.generate(&v_params, &mut rng2);
+
+        // Max Y extent (knob height) should be identical for both axes
+        let max_y_h = h_curves
+            .iter()
+            .flat_map(|c| [c.p0.y, c.p1.y, c.p2.y, c.p3.y])
+            .fold(0.0f64, f64::max);
+        let max_y_v = v_curves
+            .iter()
+            .flat_map(|c| [c.p0.y, c.p1.y, c.p2.y, c.p3.y])
+            .fold(0.0f64, f64::max);
+
+        assert!(
+            (max_y_h - max_y_v).abs() < 1e-10,
+            "knob heights should be identical across axes: h={}, v={}",
+            max_y_h,
+            max_y_v
+        );
+    }
+
+    #[test]
+    fn test_extreme_aspect_ratio_no_overlap() {
+        // Extreme aspect ratio: length=100, cross_length=20
+        // Knob height must be less than cross_length/2 = 10mm to avoid overlap with opposing knob
+        let connector = ClassicKnobConnector;
+        let params = EdgeParams {
+            length: 100.0,
+            cross_length: 20.0,
+            direction: TabDirection::Out,
+            tab_size: 0.25,
+            neck_ratio: 0.75,
+        };
+        let mut rng = create_rng("extreme-test");
+        let curves = connector.generate(&params, &mut rng);
+
+        let max_y = curves
+            .iter()
+            .flat_map(|c| [c.p0.y, c.p1.y, c.p2.y, c.p3.y])
+            .fold(0.0f64, f64::max);
+
+        // Opposing knobs share cross_length, so each knob must stay within cross_length/2
+        assert!(
+            max_y < params.cross_length / 2.0,
+            "knob max Y ({}) should be less than cross_length/2 ({}) to prevent overlap",
+            max_y,
+            params.cross_length / 2.0
+        );
+    }
 
     #[test]
     fn test_has_visible_neck() {
