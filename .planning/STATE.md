@@ -91,6 +91,8 @@ Phase 4 [x] Web GUI & Live Preview (2/2 plans)
 - Cursor-centered zoom via transform-origin 0,0 with translate+scale; zoom resets on puzzle regeneration (quick-007)
 - Piece count input auto-calcs best rows/cols for target with squarest-piece tiebreaker; no URL param needed (derived from rows*cols) (quick-010)
 - Piece size warning at <10mm threshold, visible but non-blocking (quick-010)
+- cross_length field in EdgeParams; knob base = min(length, cross_length) for uniform sizing across axes (quick-011)
+- safe_tab_max floor removed — no .max(0.15), prevents forced overlap at extreme aspect ratios (quick-011)
 
 ### Research Flags
 - **Phase 3 (Connectors):** Complete. Connector generation + SVG export pipeline fully functional.
@@ -124,13 +126,14 @@ Phase 4 [x] Web GUI & Live Preview (2/2 plans)
 | 008 | Fix kerf width setting - offset border only, not connectors | 2026-03-04 | b2d77de | [8-investigate-and-fix-kerf-width-setting-c](./quick/8-investigate-and-fix-kerf-width-setting-c/) |
 | 009 | Remove kerf width feature entirely | 2026-03-04 | efb9242 | [9-remove-kerf-width-feature-entirely-delet](./quick/9-remove-kerf-width-feature-entirely-delet/) |
 | 010 | Add piece count input with auto row/col calculation | 2026-03-04 | c559db3 | [10-add-piece-count-input-with-auto-row-col-](./quick/10-add-piece-count-input-with-auto-row-col-/) |
+| 011 | Fix vertical axis knob scaling to match horizontal | 2026-03-05 | d69e29e | [11-fix-vertical-axis-knob-scaling-to-match-](./quick/11-fix-vertical-axis-knob-scaling-to-match-/) |
 
 ## Session Continuity
 
-**Last session:** 2026-03-04T21:57:00Z
-**Stopped at:** Completed quick task 010: Add piece count input with auto row/col calculation
-**Next action:** Milestone complete — all 4 phases done, quick-001 through 010 applied
+**Last session:** 2026-03-05T01:57:00Z
+**Stopped at:** Completed quick task 011: Fix vertical axis knob scaling to match horizontal
+**Next action:** Milestone complete — all 4 phases done, quick-001 through 011 applied
 
 ---
-Last activity: 2026-03-04 - Completed quick task 010: Add piece count input with auto row/col calculation
-*Last updated: 2026-03-04T21:57:00Z*
+Last activity: 2026-03-05 - Completed quick task 011: Fix vertical axis knob scaling to match horizontal
+*Last updated: 2026-03-05T01:57:00Z*
