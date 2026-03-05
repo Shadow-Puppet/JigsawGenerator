@@ -83,11 +83,41 @@ body {
   width: 100%;
 }
 
+/* ─── Lock Toggle ──────────────────────────────────────────── */
+
+.lock-toggle {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.7rem;
+  color: #bbb;
+  padding: 0 0.15rem;
+  vertical-align: middle;
+  line-height: 1;
+  transition: color 0.15s;
+}
+
+.lock-toggle:hover {
+  color: #888;
+}
+
+.lock-toggle.locked {
+  color: #4a90d9;
+}
+
+.lock-toggle.locked:hover {
+  color: #3a7bc8;
+}
+
+/* ─── Piece Size Warning ──────────────────────────────────── */
+
 .piece-size-warning {
   font-size: 0.75rem;
   color: #e67e22;
   margin-top: 0.35rem;
   line-height: 1.3;
+  list-style: disc;
+  padding-left: 1.25rem;
 }
 
 .piece-size-warning:empty {
@@ -219,13 +249,42 @@ input[type="range"] {
   height: 1.5rem;
 }
 
+/* The container itself acts as the visible track bar.
+   --range-bg is set dynamically by JS for the blue highlight. */
+.range-slider-container::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 4px;
+  background: var(--range-bg, #ddd);
+  border-radius: 2px;
+  pointer-events: none;
+}
+
 .range-slider-container input[type="range"] {
   position: absolute;
   width: 100%;
-  top: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  margin: 0;
   pointer-events: none;
   -webkit-appearance: none;
   appearance: none;
+  background: transparent;
+  z-index: 1;
+}
+
+/* Make ALL input tracks transparent — the container ::before is the visible track */
+.range-slider-container input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  background: transparent;
+}
+
+.range-slider-container input[type="range"]::-moz-range-track {
+  height: 4px;
   background: transparent;
 }
 
@@ -240,6 +299,8 @@ input[type="range"] {
   cursor: pointer;
   border: 2px solid #fff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  position: relative;
+  z-index: 2;
 }
 
 .range-slider-container input[type="range"]::-moz-range-thumb {
@@ -251,28 +312,6 @@ input[type="range"] {
   cursor: pointer;
   border: 2px solid #fff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-}
-
-/* Ensure only the first (min) range shows the track */
-.range-slider-container input[type="range"].range-max::-webkit-slider-runnable-track {
-  background: transparent;
-}
-
-.range-slider-container input[type="range"].range-max::-moz-range-track {
-  background: transparent;
-}
-
-/* Style the track for the min slider */
-.range-slider-container input[type="range"]:first-child::-webkit-slider-runnable-track {
-  height: 4px;
-  background: #ddd;
-  border-radius: 2px;
-}
-
-.range-slider-container input[type="range"]:first-child::-moz-range-track {
-  height: 4px;
-  background: #ddd;
-  border-radius: 2px;
 }
 
 /* ─── Seed ─────────────────────────────────────────────────── */
@@ -413,7 +452,7 @@ input[type="range"] {
 }
 
 #svg-container svg path {
-  stroke-width: 0.5px !important;
+  stroke-width: 0.2px !important;
 }
 
 /* Footer with piece count + zoom controls */
