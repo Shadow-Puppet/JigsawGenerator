@@ -4,3 +4,7 @@ members = [
     "crates/puzzle-core",
     "crates/puzzle-wasm",
 ]
+
+[profile.release]
+lto = true
+codegen-units = 1
