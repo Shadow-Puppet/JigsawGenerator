@@ -1,12 +1,9 @@
 import init, {
-  generate_svg,
+  generate_edges_binary,
+  get_cached_svg,
   init_panic_hook,
 } from "puzzle-wasm";
 import "./style.css";
-
-interface ErrorResponse {
-  error: string;
-}
 
 function randomSeed(): string {
   return Math.random().toString(36).substring(2, 10);
@@ -23,7 +20,6 @@ let tabSlider: HTMLInputElement;
 let taperSlider: HTMLInputElement;
 let radiusSlider: HTMLInputElement;
 let seedInput: HTMLInputElement;
-let svgContainer: HTMLElement;
 let pieceCount: HTMLElement;
 let errorDisplay: HTMLElement;
 
@@ -62,12 +58,20 @@ let panStartX = 0;
 let panStartY = 0;
 
 let rafPending = false;
-let cachedSvgPath: SVGPathElement | null = null;
-let svgEl: SVGSVGElement | null = null;
 
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 20;
 const ZOOM_STEP = 1.15; // 15% per wheel tick
+
+// ─── Canvas State ────────────────────────────────────────────
+
+let canvas: HTMLCanvasElement | null = null;
+let ctx: CanvasRenderingContext2D | null = null;
+let edgesData: Float64Array | null = null;
+let borderData: Float64Array | null = null;
+let puzzleWidth = 0;
+let puzzleHeight = 0;
+const EDGE_STRIDE = 36;
 
 // ─── Config Builder ─────────────────────────────────────────
 
@@ -204,27 +208,164 @@ function updateRuler(): void {
   rulerHeight.textContent = `${h.toFixed(fmt)} ${unit}`;
 }
 
+// ─── Canvas Resize ───────────────────────────────────────────
+
+function resizeCanvas(): void {
+  if (!canvas || !ctx) return;
+  const dpr = window.devicePixelRatio || 1;
+  const rect = svgViewport.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  canvas.style.width = rect.width + "px";
+  canvas.style.height = rect.height + "px";
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+// ─── Canvas Drawing ──────────────────────────────────────────
+
+function drawBorder(c: CanvasRenderingContext2D): void {
+  if (!borderData) return;
+  c.beginPath();
+  let i = 0;
+  while (i < borderData.length) {
+    const cmd = borderData[i];
+    if (cmd === 0) {
+      // moveTo
+      c.moveTo(borderData[i + 1], borderData[i + 2]);
+      i += 3;
+    } else if (cmd === 1) {
+      // lineTo
+      c.lineTo(borderData[i + 1], borderData[i + 2]);
+      i += 3;
+    } else if (cmd === 2) {
+      // curveTo
+      c.bezierCurveTo(
+        borderData[i + 1],
+        borderData[i + 2],
+        borderData[i + 3],
+        borderData[i + 4],
+        borderData[i + 5],
+        borderData[i + 6],
+      );
+      i += 7;
+    } else if (cmd === 3) {
+      // closePath
+      c.closePath();
+      i += 1;
+    } else {
+      i += 1;
+    }
+  }
+  c.stroke();
+}
+
+function drawVisibleEdges(
+  c: CanvasRenderingContext2D,
+  vpL: number,
+  vpT: number,
+  vpR: number,
+  vpB: number,
+): void {
+  if (!edgesData) return;
+  const data = edgesData;
+  const len = data.length;
+
+  c.beginPath();
+
+  for (let i = 0; i < len; i += EDGE_STRIDE) {
+    // Read edge bounding box from header (start/end points)
+    const sx = data[i],
+      sy = data[i + 1],
+      ex = data[i + 2],
+      ey = data[i + 3];
+
+    // Quick AABB cull: edge bounding box vs viewport
+    const edgeLen = Math.abs(ex - sx) + Math.abs(ey - sy);
+    const margin = edgeLen * 0.35;
+    const minX = Math.min(sx, ex) - margin;
+    const maxX = Math.max(sx, ex) + margin;
+    const minY = Math.min(sy, ey) - margin;
+    const maxY = Math.max(sy, ey) + margin;
+
+    if (maxX < vpL || minX > vpR || maxY < vpT || minY > vpB) {
+      continue;
+    }
+
+    // MoveTo (first curve's p0)
+    c.moveTo(data[i + 4], data[i + 5]);
+
+    // 5 curves, 6 floats each, starting at offset 6
+    for (let ci = 0; ci < 5; ci++) {
+      const base = i + 6 + ci * 6;
+      c.bezierCurveTo(
+        data[base],
+        data[base + 1],
+        data[base + 2],
+        data[base + 3],
+        data[base + 4],
+        data[base + 5],
+      );
+    }
+  }
+
+  c.stroke();
+}
+
+function drawPuzzle(): void {
+  if (!ctx || !edgesData || !borderData) return;
+
+  const vpW = svgViewport.clientWidth;
+  const vpH = svgViewport.clientHeight;
+
+  // Clear
+  ctx.clearRect(0, 0, vpW, vpH);
+
+  // Compute transform: puzzle mm coords -> screen pixels
+  const baseScale = vpW / puzzleWidth;
+  const scale = baseScale * zoomLevel;
+
+  // Viewport bounds in puzzle mm coordinates (for culling)
+  const vpLeft = -panX / scale;
+  const vpTop = -panY / scale;
+  const vpRight = vpLeft + vpW / scale;
+  const vpBottom = vpTop + vpH / scale;
+
+  // Set up canvas transform
+  ctx.save();
+  ctx.translate(panX, panY);
+  ctx.scale(scale, scale);
+
+  // Style
+  ctx.strokeStyle = "#000000";
+  ctx.lineWidth = 0.2 / scale;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  // Draw border (always visible, small data)
+  drawBorder(ctx);
+
+  // Draw internal edges with viewport culling
+  drawVisibleEdges(ctx, vpLeft, vpTop, vpRight, vpBottom);
+
+  ctx.restore();
+}
+
 // ─── Zoom/Pan Helpers ───────────────────────────────────────
 
 function applyTransform(): void {
-  svgContainer.style.transform = `translate(${panX}px, ${panY}px) scale(${zoomLevel})`;
+  drawPuzzle();
   zoomLevelDisplay.textContent = `${Math.round(zoomLevel * 100)}%`;
-  // Keep stroke visually consistent regardless of zoom level
-  if (cachedSvgPath) cachedSvgPath.style.strokeWidth = `${0.2 / zoomLevel}px`;
 }
 
 function resetZoom(): void {
-  // First reset transform so we can measure natural SVG height
   zoomLevel = 1;
   panX = 0;
   panY = 0;
-  svgContainer.style.transform = "translate(0px, 0px) scale(1)";
-
-  // Vertically center: offset by half the difference between viewport and SVG height
-  if (svgEl && svgViewport) {
-    const viewportH = svgViewport.clientHeight;
-    const svgH = svgEl.getBoundingClientRect().height;
-    panY = Math.max(0, (viewportH - svgH) / 2);
+  if (canvas && puzzleWidth > 0) {
+    const vpH = svgViewport.clientHeight;
+    const baseScale = svgViewport.clientWidth / puzzleWidth;
+    const svgH = puzzleHeight * baseScale;
+    panY = Math.max(0, (vpH - svgH) / 2);
   }
   applyTransform();
 }
@@ -252,72 +393,48 @@ function scheduleGenerate(): void {
   });
 }
 
-// ─── SVG Generation ─────────────────────────────────────────
+// ─── Puzzle Generation ───────────────────────────────────────
 
 function generatePuzzle(): void {
   const config = buildConfig();
   const configJson = JSON.stringify(config);
 
-  // Generate SVG
-  const svgResult = generate_svg(configJson);
-  if (svgResult.startsWith("<svg")) {
-    if (svgEl !== null && cachedSvgPath !== null) {
-      // Subsequent render: diff path d and viewBox attributes only
-      const newD = svgResult.match(/d='([^']*)'/)?.[1];
-      const newViewBox = svgResult.match(/viewBox='([^']*)'/)?.[1];
-      if (newD) cachedSvgPath.setAttribute("d", newD);
-      if (newViewBox) svgEl.setAttribute("viewBox", newViewBox);
-    } else {
-      // First render: full innerHTML + normalize + cache
-      svgContainer.innerHTML = svgResult;
-
-      // Normalize SVG: remove fixed width/height, ensure viewBox fills container
-      const el = svgContainer.querySelector("svg");
-      if (el) {
-        const wAttr = el.getAttribute("width");
-        const hAttr = el.getAttribute("height");
-        // If no viewBox, create one from width/height before removing them
-        if (!el.getAttribute("viewBox") && wAttr && hAttr) {
-          const numW = parseFloat(wAttr);
-          const numH = parseFloat(hAttr);
-          if (!isNaN(numW) && !isNaN(numH)) {
-            el.setAttribute("viewBox", `0 0 ${numW} ${numH}`);
-          }
-        }
-        el.removeAttribute("width");
-        el.removeAttribute("height");
-      }
-
-      // Cache SVG element and path for subsequent diff renders
-      svgEl = el as SVGSVGElement | null;
-      cachedSvgPath = svgEl?.querySelector("path") as SVGPathElement | null;
-    }
-
-    errorDisplay.style.display = "none";
-
-    // Compute piece breakdown in JS (avoids redundant WASM roundtrip)
-    const rows = parseInt(rowsInput.value, 10);
-    const cols = parseInt(colsInput.value, 10);
-    const total = rows * cols;
-    const corners = 4;
-    const edges = 2 * (rows - 2) + 2 * (cols - 2);
-    const interior = (rows - 2) * (cols - 2);
-    pieceCount.textContent = `${total} pieces (${corners} corner, ${edges} edge, ${interior} interior)`;
-  } else {
-    // Error — keep previous SVG visible, show error message
+  // Generate binary edge data (also caches SVG internally for download)
+  const result = generate_edges_binary(configJson);
+  if (result && result.error) {
     try {
-      const err: ErrorResponse = JSON.parse(svgResult);
-      errorDisplay.textContent = err.error || "Unknown error";
+      errorDisplay.textContent = result.error || "Unknown error";
     } catch {
-      errorDisplay.textContent = "SVG generation failed";
+      errorDisplay.textContent = "Generation failed";
     }
     errorDisplay.style.display = "block";
+    return;
   }
 
-  // Update URL with current params (debounced — no history spam)
+  edgesData = result.edges;
+  borderData = result.border;
+  puzzleWidth = result.width;
+  puzzleHeight = result.height;
+
+  errorDisplay.style.display = "none";
+
+  // Compute piece breakdown in JS
+  const rows = parseInt(rowsInput.value, 10);
+  const cols = parseInt(colsInput.value, 10);
+  const total = rows * cols;
+  const corners = 4;
+  const edges = 2 * (rows - 2) + 2 * (cols - 2);
+  const interior = (rows - 2) * (cols - 2);
+  pieceCount.textContent = `${total} pieces (${corners} corner, ${edges} edge, ${interior} interior)`;
+
+  // Resize canvas and draw
+  resizeCanvas();
+  drawPuzzle();
+
+  // Update URL with current params (debounced)
   scheduleURLUpdate();
 
-  // Update ruler (zoom/pan state preserved across regenerations)
+  // Update ruler
   updateRuler();
 }
 
@@ -327,7 +444,7 @@ function updateRangeHighlight(
   minSlider: HTMLInputElement,
   maxSlider: HTMLInputElement,
   track: HTMLElement,
-  active: boolean
+  active: boolean,
 ): void {
   if (!active) {
     track.style.setProperty("--range-bg", "#ddd");
@@ -340,7 +457,7 @@ function updateRangeHighlight(
   const rightPct = ((parseFloat(maxSlider.value) - min) / range) * 100;
   track.style.setProperty(
     "--range-bg",
-    `linear-gradient(to right, #ddd ${leftPct}%, #4a90d9 ${leftPct}%, #4a90d9 ${rightPct}%, #ddd ${rightPct}%)`
+    `linear-gradient(to right, #ddd ${leftPct}%, #4a90d9 ${leftPct}%, #4a90d9 ${rightPct}%, #ddd ${rightPct}%)`,
   );
 }
 
@@ -369,7 +486,7 @@ function updateReadouts(): void {
 function toggleRandomize(
   checkbox: HTMLInputElement,
   maxSlider: HTMLInputElement,
-  minSlider: HTMLInputElement
+  minSlider: HTMLInputElement,
 ): void {
   if (checkbox.checked) {
     maxSlider.style.display = "";
@@ -395,7 +512,7 @@ function toggleRandomize(
 
 function clampMinMax(
   minSlider: HTMLInputElement,
-  maxSlider: HTMLInputElement
+  maxSlider: HTMLInputElement,
 ): void {
   const step = parseFloat(minSlider.step) || 0.01;
   const max = parseFloat(maxSlider.max);
@@ -411,7 +528,7 @@ function clampMinMax(
 
 function clampMaxMin(
   minSlider: HTMLInputElement,
-  maxSlider: HTMLInputElement
+  maxSlider: HTMLInputElement,
 ): void {
   const step = parseFloat(minSlider.step) || 0.01;
   const min = parseFloat(minSlider.min);
@@ -529,8 +646,8 @@ function enforceConstraints(source: "grid" | "dims"): void {
         warnings.push(`Pieces are very small (~${display}mm). Unlock dimensions to auto-adjust.`);
       } else {
         // Scale up dimensions so smallest piece = 10mm
-        const needW = cols * 10; // mm needed for width
-        const needH = rows * 10; // mm needed for height
+        const needW = cols * 10;
+        const needH = rows * 10;
         const newWMM = Math.max(widthMM, needW);
         const newHMM = Math.max(heightMM, needH);
         const newW = newWMM / factor;
@@ -545,7 +662,7 @@ function enforceConstraints(source: "grid" | "dims"): void {
       }
     }
 
-    // Grid ratio check — this is a grid problem, warn regardless
+    // Grid ratio check
     const gridRatio = Math.max(rows, cols) / Math.min(rows, cols);
     if (gridRatio > 5) {
       warnings.push(`Grid ratio ${rows}:${cols} is very extreme. Max recommended ratio is 1:5.`);
@@ -638,7 +755,6 @@ async function main(): Promise<void> {
   taperSlider = document.getElementById("taper") as HTMLInputElement;
   radiusSlider = document.getElementById("radius") as HTMLInputElement;
   seedInput = document.getElementById("seed") as HTMLInputElement;
-  svgContainer = document.getElementById("svg-container")!;
   pieceCount = document.getElementById("piece-count")!;
   errorDisplay = document.getElementById("error-display")!;
 
@@ -652,18 +768,29 @@ async function main(): Promise<void> {
   tabTrack = document.getElementById("tab-track")!;
   taperTrack = document.getElementById("taper-track")!;
 
-    pieceTargetInput = document.getElementById("piece-target") as HTMLInputElement;
-    pieceSizeWarning = document.getElementById("piece-size-warning")!;
-    gridLockBtn = document.getElementById("grid-lock")!;
-    dimsLockBtn = document.getElementById("dims-lock")!;
+  pieceTargetInput = document.getElementById("piece-target") as HTMLInputElement;
+  pieceSizeWarning = document.getElementById("piece-size-warning")!;
+  gridLockBtn = document.getElementById("grid-lock")!;
+  dimsLockBtn = document.getElementById("dims-lock")!;
 
-    rulerWidth = document.getElementById("ruler-width")!;
-    rulerHeight = document.getElementById("ruler-height")!;
+  rulerWidth = document.getElementById("ruler-width")!;
+  rulerHeight = document.getElementById("ruler-height")!;
   svgViewport = document.getElementById("svg-viewport")!;
   zoomLevelDisplay = document.getElementById("zoom-level")!;
   zoomInBtn = document.getElementById("zoom-in")!;
   zoomOutBtn = document.getElementById("zoom-out")!;
   zoomResetBtn = document.getElementById("zoom-reset")!;
+
+  // Initialize canvas
+  canvas = document.getElementById("puzzle-canvas") as HTMLCanvasElement;
+  ctx = canvas.getContext("2d");
+
+  // ResizeObserver for viewport resize
+  const resizeObserver = new ResizeObserver(() => {
+    resizeCanvas();
+    drawPuzzle();
+  });
+  resizeObserver.observe(svgViewport);
 
   // Load params from URL (if any), otherwise generate random seed
   const hasUrlParams = loadFromURL();
@@ -680,44 +807,44 @@ async function main(): Promise<void> {
 
   // ─── Event Wiring ───────────────────────────────────────
 
-    // Lock toggle buttons
-    gridLockBtn.addEventListener("click", () => {
-      gridLocked = toggleLock(gridLockBtn, gridLocked, "grid size");
-    });
-    dimsLockBtn.addEventListener("click", () => {
-      dimsLocked = toggleLock(dimsLockBtn, dimsLocked, "dimensions");
-    });
+  // Lock toggle buttons
+  gridLockBtn.addEventListener("click", () => {
+    gridLocked = toggleLock(gridLockBtn, gridLocked, "grid size");
+  });
+  dimsLockBtn.addEventListener("click", () => {
+    dimsLocked = toggleLock(dimsLockBtn, dimsLocked, "dimensions");
+  });
 
-    // Grid inputs — rows/cols changed by user
-    for (const input of [rowsInput, colsInput]) {
-      input.addEventListener("input", () => {
-        syncPieceCount();
-        enforceConstraints("grid");
-        updateTabMax();
-        updateReadouts();
-        scheduleGenerate();
-      });
+  // Grid inputs — rows/cols changed by user
+  for (const input of [rowsInput, colsInput]) {
+    input.addEventListener("input", () => {
+      syncPieceCount();
+      enforceConstraints("grid");
+      updateTabMax();
+      updateReadouts();
+      scheduleGenerate();
+    });
+  }
+
+  // Dimension inputs — width/height changed by user
+  for (const input of [widthInput, heightInput]) {
+    input.addEventListener("input", () => {
+      enforceConstraints("dims");
+      updateTabMax();
+      updateReadouts();
+      scheduleGenerate();
+    });
+  }
+
+  // Piece count input — auto-calculate best grid
+  pieceTargetInput.addEventListener("input", () => {
+    const target = parseInt(pieceTargetInput.value, 10);
+    if (!isNaN(target) && target >= 4) {
+      calcBestGrid(target);
+      syncPieceCount();
+      enforceConstraints("grid");
     }
-
-    // Dimension inputs — width/height changed by user
-    for (const input of [widthInput, heightInput]) {
-      input.addEventListener("input", () => {
-        enforceConstraints("dims");
-        updateTabMax();
-        updateReadouts();
-        scheduleGenerate();
-      });
-    }
-
-    // Piece count input — auto-calculate best grid
-    pieceTargetInput.addEventListener("input", () => {
-      const target = parseInt(pieceTargetInput.value, 10);
-      if (!isNaN(target) && target >= 4) {
-        calcBestGrid(target);
-        syncPieceCount(); // Update to show actual total (may differ from target)
-        enforceConstraints("grid");
-      }
-    });
+  });
 
   // Range sliders — update readout + regenerate
   const sliders = [tabSlider, taperSlider, radiusSlider];
@@ -755,15 +882,15 @@ async function main(): Promise<void> {
     toggleRandomize(taperRandomize, taperMaxSlider, taperSlider);
   });
 
-    // Unit select — convert dimensions and recalculate tab max
-    unitSelect.addEventListener("change", () => {
-      const newUnit = unitSelect.value;
-      convertDimensions(previousUnit, newUnit);
-      previousUnit = newUnit;
-      updateTabMax();
-      generatePuzzle();
-      enforceConstraints("dims");
-    });
+  // Unit select — convert dimensions and recalculate tab max
+  unitSelect.addEventListener("change", () => {
+    const newUnit = unitSelect.value;
+    convertDimensions(previousUnit, newUnit);
+    previousUnit = newUnit;
+    updateTabMax();
+    generatePuzzle();
+    enforceConstraints("dims");
+  });
 
   // Seed text input
   seedInput.addEventListener("input", scheduleGenerate);
@@ -922,13 +1049,10 @@ async function main(): Promise<void> {
 
   const downloadBtn = document.getElementById("download")!;
   downloadBtn.addEventListener("click", () => {
-    // Re-generate SVG for download (with original physical dimensions from WASM)
-    const config = buildConfig();
-    const configJson = JSON.stringify(config);
-    const svgContent = generate_svg(configJson);
-    if (!svgContent.startsWith("<svg")) return;
-    const configObj = config as Record<string, unknown>;
-    const filename = `puzzle-${configObj.rows}x${configObj.cols}-seed-${configObj.seed}.svg`;
+    const svgContent = get_cached_svg();
+    if (!svgContent || !svgContent.startsWith("<svg")) return;
+    const config = buildConfig() as Record<string, unknown>;
+    const filename = `puzzle-${config.rows}x${config.cols}-seed-${config.seed}.svg`;
     const blob = new Blob([svgContent], { type: "image/svg+xml" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -965,12 +1089,12 @@ async function main(): Promise<void> {
     }
   });
 
-    // ─── Initial Generate ─────────────────────────────────────
+  // ─── Initial Generate ─────────────────────────────────────
 
-    syncPieceCount(); // Populate piece count from current rows * cols
-    enforceConstraints("grid"); // Check initial piece dimensions
-    generatePuzzle();
-    resetZoom(); // Center vertically on first load
+  syncPieceCount();
+  enforceConstraints("grid");
+  generatePuzzle();
+  resetZoom();
 }
 
 main();
