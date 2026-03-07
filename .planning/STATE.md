@@ -104,6 +104,10 @@ Phase 4 [x] Web GUI & Live Preview (2/2 plans)
 - rAF-throttled pan/zoom transforms via scheduleTransform(); direct call kept for button clicks (quick-014)
 - URL sync debounced at 300ms trailing to prevent replaceState spam during rapid input (quick-014)
 - WASM -O3 instead of -Os for speed over size; LTO + codegen-units=1 for max release optimization (quick-014)
+- Canvas 2D replaces SVG for puzzle display; context transform (not CSS transform) for crisp rendering at any zoom (quick-015)
+- Binary edge data transfer: 36-float fixed stride per edge, zero string parsing; command-prefixed border encoding (quick-015)
+- AABB viewport culling with 35% margin for knob protrusion — only visible edges drawn per frame (quick-015)
+- SVG cached at generation time via thread_local! in WASM; get_cached_svg() for instant download without regeneration (quick-015)
 
 ### Research Flags
 - **Phase 3 (Connectors):** Complete. Connector generation + SVG export pipeline fully functional.
@@ -116,6 +120,7 @@ Phase 4 [x] Web GUI & Live Preview (2/2 plans)
 - kurbo `bounding_box()` requires importing `ParamCurveExtrema` trait
 - kurbo BezPath.to_svg() outputs absolute uppercase commands (M, L, C, Z) — perfect for laser cutter SVG
 - WASM binary with full SVG export pipeline is ~93KB gzipped (up from ~56KB with grid engine only)
+- WASM binary with binary export + js-sys is ~78KB gzipped / 169KB uncompressed (quick-015)
 
 ### TODOs
 (None yet)
@@ -141,13 +146,14 @@ Phase 4 [x] Web GUI & Live Preview (2/2 plans)
 | 012 | Auto-adjust dimensions/grid to prevent warnings with lock/unlock toggles | 2026-03-05 | fac44e9 | [12-auto-adjust-dimensions-grid-to-prevent-w](./quick/12-auto-adjust-dimensions-grid-to-prevent-w/) |
 | 013 | Optimize SVG rendering performance for large puzzles | 2026-03-05 | 3f25219 | [13-optimize-svg-rendering-performance-for-l](./quick/13-optimize-svg-rendering-performance-for-l/) |
 | 014 | Buttery smooth UI: GPU compositing, inline tab max, SVG diffing, rAF throttle, URL debounce, WASM -O3/LTO | 2026-03-07 | 600936d | [14-buttery-smooth-ui-gpu-compositing-inline](./quick/14-buttery-smooth-ui-gpu-compositing-inline/) |
+| 015 | Canvas 2D renderer with viewport culling and binary WASM data transfer | 2026-03-07 | 8157208 | [15-optimize-large-puzzle-performance-for-sm](./quick/15-optimize-large-puzzle-performance-for-sm/) |
 
 ## Session Continuity
 
-**Last session:** 2026-03-07T06:16:29Z
-**Stopped at:** Completed quick task 014: Buttery smooth UI — GPU compositing & inline optimizations
-**Next action:** Milestone complete — all 4 phases done, quick-001 through 014 applied
+**Last session:** 2026-03-07T16:24:48Z
+**Stopped at:** Completed quick task 015: Canvas 2D renderer with viewport culling and binary WASM transfer
+**Next action:** Milestone complete — all 4 phases done, quick-001 through 015 applied
 
 ---
-Last activity: 2026-03-07 - Completed quick task 014: Buttery smooth UI — GPU compositing & inline optimizations
-*Last updated: 2026-03-07T06:20:46Z*
+Last activity: 2026-03-07 - Completed quick task 015: Canvas 2D + viewport culling + binary WASM transfer
+*Last updated: 2026-03-07T16:24:48Z*
