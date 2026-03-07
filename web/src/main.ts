@@ -1,7 +1,6 @@
 import init, {
   generate_svg,
   init_panic_hook,
-  safe_tab_max,
 } from "puzzle-wasm";
 import "./style.css";
 
@@ -64,6 +63,7 @@ let panStartY = 0;
 
 let rafPending = false;
 let cachedSvgPath: SVGPathElement | null = null;
+let svgEl: SVGSVGElement | null = null;
 
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 20;
@@ -164,28 +164,33 @@ function updateURL(): void {
   history.replaceState(null, "", "?" + params.toString());
 }
 
+// ─── Debounced URL Sync ──────────────────────────────────────
+
+let urlTimeout: ReturnType<typeof setTimeout> | null = null;
+function scheduleURLUpdate(): void {
+  if (urlTimeout !== null) clearTimeout(urlTimeout);
+  urlTimeout = setTimeout(updateURL, 300);
+}
+
 // ─── Dynamic Tab Size Clamping ───────────────────────────────
 
 function updateTabMax(): void {
-  const config = buildConfig();
-  const configJson = JSON.stringify(config);
-  try {
-    const result = JSON.parse(safe_tab_max(configJson));
-    if (result.max) {
-      const max = Math.round(result.max * 100) / 100; // round to 2 decimals
-      tabSlider.max = String(max);
-      tabMaxSlider.max = String(max);
-      // Clamp current value if it exceeds new max
-      if (parseFloat(tabSlider.value) > max) {
-        tabSlider.value = String(max);
-      }
-      if (parseFloat(tabMaxSlider.value) > max) {
-        tabMaxSlider.value = String(max);
-      }
-    }
-  } catch {
-    // Fallback: keep current max
-  }
+  const rows = parseInt(rowsInput.value, 10) || 1;
+  const cols = parseInt(colsInput.value, 10) || 1;
+  const w = parseFloat(widthInput.value) || 1;
+  const h = parseFloat(heightInput.value) || 1;
+  const cellW = w / cols;
+  const cellH = h / rows;
+  const maxH = cellH / (2.0 * cellW * 1.2);
+  const maxV = cellW / (2.0 * cellH * 1.2);
+  const maxApproach = 1.0 / (2.0 * 1.2);
+  const safeMax = Math.min(maxH, maxV, maxApproach) * 0.9;
+  const tabMax = Math.min(safeMax, 0.25);
+
+  tabSlider.max = String(tabMax);
+  tabMaxSlider.max = String(tabMax);
+  if (parseFloat(tabSlider.value) > tabMax) tabSlider.value = String(tabMax);
+  if (parseFloat(tabMaxSlider.value) > tabMax) tabMaxSlider.value = String(tabMax);
 }
 
 // ─── Ruler Update ───────────────────────────────────────────
@@ -216,13 +221,24 @@ function resetZoom(): void {
   svgContainer.style.transform = "translate(0px, 0px) scale(1)";
 
   // Vertically center: offset by half the difference between viewport and SVG height
-  const svgEl = svgContainer.querySelector("svg");
   if (svgEl && svgViewport) {
     const viewportH = svgViewport.clientHeight;
     const svgH = svgEl.getBoundingClientRect().height;
     panY = Math.max(0, (viewportH - svgH) / 2);
   }
   applyTransform();
+}
+
+// ─── rAF-Throttled Transform ─────────────────────────────────
+
+let transformRafPending = false;
+function scheduleTransform(): void {
+  if (transformRafPending) return;
+  transformRafPending = true;
+  requestAnimationFrame(() => {
+    transformRafPending = false;
+    applyTransform();
+  });
 }
 
 // ─── Throttled Generation ────────────────────────────────────
@@ -245,27 +261,37 @@ function generatePuzzle(): void {
   // Generate SVG
   const svgResult = generate_svg(configJson);
   if (svgResult.startsWith("<svg")) {
-    svgContainer.innerHTML = svgResult;
+    if (svgEl !== null && cachedSvgPath !== null) {
+      // Subsequent render: diff path d and viewBox attributes only
+      const newD = svgResult.match(/d='([^']*)'/)?.[1];
+      const newViewBox = svgResult.match(/viewBox='([^']*)'/)?.[1];
+      if (newD) cachedSvgPath.setAttribute("d", newD);
+      if (newViewBox) svgEl.setAttribute("viewBox", newViewBox);
+    } else {
+      // First render: full innerHTML + normalize + cache
+      svgContainer.innerHTML = svgResult;
 
-    // Normalize SVG: remove fixed width/height, ensure viewBox fills container
-    const svgEl = svgContainer.querySelector("svg");
-    if (svgEl) {
-      const wAttr = svgEl.getAttribute("width");
-      const hAttr = svgEl.getAttribute("height");
-      // If no viewBox, create one from width/height before removing them
-      if (!svgEl.getAttribute("viewBox") && wAttr && hAttr) {
-        const numW = parseFloat(wAttr);
-        const numH = parseFloat(hAttr);
-        if (!isNaN(numW) && !isNaN(numH)) {
-          svgEl.setAttribute("viewBox", `0 0 ${numW} ${numH}`);
+      // Normalize SVG: remove fixed width/height, ensure viewBox fills container
+      const el = svgContainer.querySelector("svg");
+      if (el) {
+        const wAttr = el.getAttribute("width");
+        const hAttr = el.getAttribute("height");
+        // If no viewBox, create one from width/height before removing them
+        if (!el.getAttribute("viewBox") && wAttr && hAttr) {
+          const numW = parseFloat(wAttr);
+          const numH = parseFloat(hAttr);
+          if (!isNaN(numW) && !isNaN(numH)) {
+            el.setAttribute("viewBox", `0 0 ${numW} ${numH}`);
+          }
         }
+        el.removeAttribute("width");
+        el.removeAttribute("height");
       }
-      svgEl.removeAttribute("width");
-      svgEl.removeAttribute("height");
-    }
 
-    // Cache path element for applyTransform() (avoids DOM query per zoom/pan frame)
-    cachedSvgPath = svgEl?.querySelector("path") as SVGPathElement | null;
+      // Cache SVG element and path for subsequent diff renders
+      svgEl = el as SVGSVGElement | null;
+      cachedSvgPath = svgEl?.querySelector("path") as SVGPathElement | null;
+    }
 
     errorDisplay.style.display = "none";
 
@@ -288,8 +314,8 @@ function generatePuzzle(): void {
     errorDisplay.style.display = "block";
   }
 
-  // Update URL with current params (replaceState — no history spam)
-  updateURL();
+  // Update URL with current params (debounced — no history spam)
+  scheduleURLUpdate();
 
   // Update ruler (zoom/pan state preserved across regenerations)
   updateRuler();
@@ -772,7 +798,7 @@ async function main(): Promise<void> {
       panX = mouseX - zoomRatio * (mouseX - panX);
       panY = mouseY - zoomRatio * (mouseY - panY);
 
-      applyTransform();
+      scheduleTransform();
     },
     { passive: false },
   );
@@ -790,7 +816,7 @@ async function main(): Promise<void> {
     if (!isPanning) return;
     panX = e.clientX - panStartX;
     panY = e.clientY - panStartY;
-    applyTransform();
+    scheduleTransform();
   });
 
   window.addEventListener("mouseup", () => {
@@ -858,7 +884,7 @@ async function main(): Promise<void> {
       if (e.touches.length === 1 && isPanning) {
         panX = e.touches[0].clientX - panStartX;
         panY = e.touches[0].clientY - panStartY;
-        applyTransform();
+        scheduleTransform();
       } else if (e.touches.length === 2) {
         const dx = e.touches[0].clientX - e.touches[1].clientX;
         const dy = e.touches[0].clientY - e.touches[1].clientY;
@@ -878,7 +904,7 @@ async function main(): Promise<void> {
           const cy = midY - rect.top;
           panX = cx - zoomRatio * (cx - panX);
           panY = cy - zoomRatio * (cy - panY);
-          applyTransform();
+          scheduleTransform();
         }
 
         lastTouchDist = dist;
