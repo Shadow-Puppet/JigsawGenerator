@@ -98,6 +98,12 @@ Phase 4 [x] Web GUI & Live Preview (2/2 plans)
 - rAF throttle on generatePuzzle() for all rapid-fire input handlers; direct call kept for unit-select and initial load (quick-013)
 - Cached SVG path element avoids DOM querySelector per zoom/pan frame (quick-013)
 - Inline JS piece count math replaces compute_pieces WASM roundtrip (quick-013)
+- GPU compositing via will-change:transform on #svg-container; CSS containment on #svg-viewport (quick-014)
+- Inline JS tab max math replaces safe_tab_max WASM roundtrip — identical formula, zero overhead (quick-014)
+- SVG path attribute diffing: subsequent renders update d/viewBox attrs only, skip innerHTML (quick-014)
+- rAF-throttled pan/zoom transforms via scheduleTransform(); direct call kept for button clicks (quick-014)
+- URL sync debounced at 300ms trailing to prevent replaceState spam during rapid input (quick-014)
+- WASM -O3 instead of -Os for speed over size; LTO + codegen-units=1 for max release optimization (quick-014)
 
 ### Research Flags
 - **Phase 3 (Connectors):** Complete. Connector generation + SVG export pipeline fully functional.
@@ -134,13 +140,14 @@ Phase 4 [x] Web GUI & Live Preview (2/2 plans)
 | 011 | Fix vertical axis knob scaling to match horizontal | 2026-03-05 | d69e29e | [11-fix-vertical-axis-knob-scaling-to-match-](./quick/11-fix-vertical-axis-knob-scaling-to-match-/) |
 | 012 | Auto-adjust dimensions/grid to prevent warnings with lock/unlock toggles | 2026-03-05 | fac44e9 | [12-auto-adjust-dimensions-grid-to-prevent-w](./quick/12-auto-adjust-dimensions-grid-to-prevent-w/) |
 | 013 | Optimize SVG rendering performance for large puzzles | 2026-03-05 | 3f25219 | [13-optimize-svg-rendering-performance-for-l](./quick/13-optimize-svg-rendering-performance-for-l/) |
+| 014 | Buttery smooth UI: GPU compositing, inline tab max, SVG diffing, rAF throttle, URL debounce, WASM -O3/LTO | 2026-03-07 | 600936d | [14-buttery-smooth-ui-gpu-compositing-inline](./quick/14-buttery-smooth-ui-gpu-compositing-inline/) |
 
 ## Session Continuity
 
-**Last session:** 2026-03-05T04:19:00Z
-**Stopped at:** Completed quick task 013: Optimize SVG rendering performance for large puzzles
-**Next action:** Milestone complete — all 4 phases done, quick-001 through 013 applied
+**Last session:** 2026-03-07T06:16:29Z
+**Stopped at:** Completed quick task 014: Buttery smooth UI — GPU compositing & inline optimizations
+**Next action:** Milestone complete — all 4 phases done, quick-001 through 014 applied
 
 ---
-Last activity: 2026-03-05 - Completed quick task 013: Optimize SVG rendering performance for large puzzles
-*Last updated: 2026-03-05T04:19:00Z*
+Last activity: 2026-03-07 - Completed quick task 014: Buttery smooth UI — GPU compositing & inline optimizations
+*Last updated: 2026-03-07T06:20:46Z*
