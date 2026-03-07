@@ -1,3 +1,4 @@
+pub mod binary_export;
 pub mod classic_connector;
 pub mod config;
 pub mod connector;
@@ -7,6 +8,7 @@ pub mod piece;
 pub mod seed;
 pub mod svg_export;
 
+pub use binary_export::*;
 pub use classic_connector::*;
 pub use config::*;
 pub use connector::*;

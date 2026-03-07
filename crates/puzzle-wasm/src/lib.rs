@@ -1,9 +1,16 @@
+use std::cell::RefCell;
+
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
 use puzzle_core::{
-    compute_piece_breakdown, ClassicKnobConnector, GridConfig, PieceType, PuzzleConfig, PuzzleGrid,
+    border_to_binary, compute_piece_breakdown, edges_to_binary, ClassicKnobConnector, GridConfig,
+    PieceType, PuzzleConfig, PuzzleGrid,
 };
+
+thread_local! {
+    static CACHED_SVG: RefCell<String> = RefCell::new(String::new());
+}
 
 /// Initialize the panic hook for better error messages in the browser console.
 #[wasm_bindgen]
@@ -236,6 +243,94 @@ pub fn generate_svg(config_json: &str) -> String {
 
     // 4. Generate and return SVG
     puzzle_core::generate_svg(&grid)
+}
+
+/// Generate binary edge data for Canvas 2D rendering.
+///
+/// Returns a JS object with:
+/// - `edges`: Float64Array of internal edge connector curves (36 floats per edge)
+/// - `border`: Float64Array of border path drawing commands
+/// - `width`: puzzle width in mm
+/// - `height`: puzzle height in mm
+///
+/// Also caches the SVG string internally for retrieval via `get_cached_svg()`.
+///
+/// On error: returns a JS object with `error` property.
+#[wasm_bindgen]
+pub fn generate_edges_binary(config_json: &str) -> JsValue {
+    // 1. Deserialize PuzzleConfig from JSON
+    let mut config: PuzzleConfig = match serde_json::from_str(config_json) {
+        Ok(c) => c,
+        Err(e) => {
+            let obj = js_sys::Object::new();
+            let _ = js_sys::Reflect::set(
+                &obj,
+                &JsValue::from_str("error"),
+                &JsValue::from_str(&format!("Invalid JSON: {}", e)),
+            );
+            return obj.into();
+        }
+    };
+
+    // Handle empty seed
+    if config.seed.is_empty() {
+        config.seed = "default".to_string();
+    }
+
+    // 2. Create PuzzleGrid
+    let mut grid = match PuzzleGrid::new(config) {
+        Ok(g) => g,
+        Err(e) => {
+            let obj = js_sys::Object::new();
+            let _ = js_sys::Reflect::set(&obj, &JsValue::from_str("error"), &JsValue::from_str(&e));
+            return obj.into();
+        }
+    };
+
+    let width = grid.config.width;
+    let height = grid.config.height;
+
+    // 3. Generate connectors
+    grid.generate_connectors(&ClassicKnobConnector);
+
+    // 4. Cache SVG (generated from same grid, no need to regenerate later)
+    let svg = puzzle_core::generate_svg(&grid);
+    CACHED_SVG.with(|c| {
+        *c.borrow_mut() = svg;
+    });
+
+    // 5. Generate binary data
+    let edges_data = edges_to_binary(&grid);
+    let border_data = border_to_binary(&grid);
+
+    // 6. Create Float64Arrays
+    let edges_arr = js_sys::Float64Array::new_with_length(edges_data.len() as u32);
+    edges_arr.copy_from(&edges_data);
+
+    let border_arr = js_sys::Float64Array::new_with_length(border_data.len() as u32);
+    border_arr.copy_from(&border_data);
+
+    // 7. Build result object
+    let obj = js_sys::Object::new();
+    let _ = js_sys::Reflect::set(&obj, &JsValue::from_str("edges"), &edges_arr);
+    let _ = js_sys::Reflect::set(&obj, &JsValue::from_str("border"), &border_arr);
+    let _ = js_sys::Reflect::set(&obj, &JsValue::from_str("width"), &JsValue::from_f64(width));
+    let _ = js_sys::Reflect::set(
+        &obj,
+        &JsValue::from_str("height"),
+        &JsValue::from_f64(height),
+    );
+
+    obj.into()
+}
+
+/// Retrieve the cached SVG string from the last `generate_edges_binary()` call.
+///
+/// Returns the full SVG string with physical mm dimensions, suitable for
+/// laser-cutter download. Returns empty string if no SVG has been generated yet.
+#[wasm_bindgen]
+pub fn get_cached_svg() -> String {
+    CACHED_SVG.with(|c| c.borrow().clone())
 }
 
 /// Compute the safe maximum tab size for a given grid configuration.

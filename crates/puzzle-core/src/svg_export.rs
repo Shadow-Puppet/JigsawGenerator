@@ -65,7 +65,7 @@ fn build_puzzle_path(grid: &PuzzleGrid) -> BezPath {
 ///
 /// Walk clockwise: top → right → bottom → left with quarter-circle arcs
 /// at each corner. Returns a single closed subpath.
-fn build_border_path(grid: &PuzzleGrid) -> BezPath {
+pub(crate) fn build_border_path(grid: &PuzzleGrid) -> BezPath {
     let mut path = BezPath::new();
 
     let w = grid.config.width;
@@ -176,7 +176,7 @@ fn build_connector_paths(grid: &PuzzleGrid) -> BezPath {
 ///
 /// Edge-local: origin at edge start, x-axis along edge direction.
 /// Global: the puzzle coordinate system in mm.
-fn edge_transform(start: Point, end: Point) -> Affine {
+pub(crate) fn edge_transform(start: Point, end: Point) -> Affine {
     let angle = (end.y - start.y).atan2(end.x - start.x);
     Affine::translate(start.to_vec2()) * Affine::rotate(angle)
 }
