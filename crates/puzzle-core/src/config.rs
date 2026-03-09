@@ -37,10 +37,10 @@ pub struct TabConfig {
     /// The effective maximum is dynamically clamped based on grid dimensions
     /// to prevent opposing tabs from overlapping.
     pub size_pct: f64,
-    /// Taper amount controlling the neck-to-body ratio (0.50..=1.20, default 0.50).
-    /// 0.50 = mild taper, 0.85 = moderate snap-fit, 1.20 = aggressive taper
+    /// Taper amount controlling the neck-to-body ratio (0.57..=1.32, default 0.57).
+    /// 0.57 = mild taper, 0.95 = moderate snap-fit, 1.32 = aggressive taper
     /// (narrow neck, wide body). Note: the UI presents this as a normalized 0-1
-    /// range; the WASM layer maps user 0→internal 0.5, user 1→internal 1.2.
+    /// range; the WASM layer maps user 0→internal 0.57, user 1→internal 1.32.
     #[serde(default = "default_taper")]
     pub taper: f64,
     /// Optional max for per-edge randomization. When Some, each edge gets
@@ -54,14 +54,14 @@ pub struct TabConfig {
 }
 
 fn default_taper() -> f64 {
-    0.5
+    0.57
 }
 
 impl Default for TabConfig {
     fn default() -> Self {
         Self {
             size_pct: 0.25,
-            taper: 0.5,
+            taper: 0.57,
             size_pct_max: None,
             taper_max: None,
         }
@@ -77,9 +77,9 @@ impl TabConfig {
                 self.size_pct
             ));
         }
-        if self.taper < 0.50 || self.taper > 1.20 {
+        if self.taper < 0.57 || self.taper > 1.32 {
             return Err(format!(
-                "tab taper must be between 0.50 and 1.20, got {}",
+                "tab taper must be between 0.57 and 1.32, got {}",
                 self.taper
             ));
         }
@@ -98,9 +98,9 @@ impl TabConfig {
             }
         }
         if let Some(max) = self.taper_max {
-            if max < 0.50 || max > 1.20 {
+            if max < 0.57 || max > 1.32 {
                 return Err(format!(
-                    "tab taper_max must be between 0.50 and 1.20, got {}",
+                    "tab taper_max must be between 0.57 and 1.32, got {}",
                     max
                 ));
             }
@@ -115,7 +115,7 @@ impl TabConfig {
     }
 
     /// Compute the neck-to-body width ratio from the taper value.
-    /// taper=0.50 → ratio=0.75 (mild), taper=0.85 → ratio=0.575, taper=1.20 → ratio=0.40 (aggressive).
+    /// taper=0.57 → ratio=0.715 (mild), taper=0.95 → ratio=0.525, taper=1.32 → ratio=0.34 (aggressive).
     pub fn neck_ratio(&self) -> f64 {
         1.0 - self.taper * 0.5
     }
@@ -449,7 +449,7 @@ mod tests {
             Unit::Millimeters,
             TabConfig {
                 size_pct: 0.15,
-                taper: 0.50,
+                taper: 0.57,
                 size_pct_max: None,
                 taper_max: None,
             },
@@ -467,7 +467,7 @@ mod tests {
             Unit::Millimeters,
             TabConfig {
                 size_pct: 0.25,
-                taper: 1.20,
+                taper: 1.32,
                 size_pct_max: None,
                 taper_max: None,
             },
@@ -487,9 +487,9 @@ mod tests {
             Unit::Millimeters,
             TabConfig {
                 size_pct: 0.15,
-                taper: 0.50,
+                taper: 0.57,
                 size_pct_max: Some(0.25),
-                taper_max: Some(1.20),
+                taper_max: Some(1.32),
             },
             BorderConfig {
                 corner_radius: 10.0,
@@ -523,7 +523,7 @@ mod tests {
         use crate::seed::create_rng;
         let tab = TabConfig {
             size_pct: 0.15,
-            taper: 0.50,
+            taper: 0.57,
             size_pct_max: Some(0.25),
             taper_max: None,
         };
@@ -565,17 +565,17 @@ mod tests {
         use crate::seed::create_rng;
         let tab = TabConfig {
             size_pct: 0.25,
-            taper: 0.50,
+            taper: 0.57,
             size_pct_max: None,
-            taper_max: Some(1.20),
+            taper_max: Some(1.32),
         };
         let mut rng = create_rng("neck-range-test");
         let mut values = Vec::new();
         for _ in 0..20 {
             let v = tab.randomize_neck_ratio(&mut rng);
-            // taper in [0.50, 1.20] → neck_ratio in [0.40, 0.75]
+            // taper in [0.57, 1.32] → neck_ratio in [0.34, 0.715]
             assert!(
-                v >= 0.40 - 1e-10 && v <= 0.75 + 1e-10,
+                v >= 0.34 - 1e-10 && v <= 0.715 + 1e-10,
                 "neck_ratio {} out of range",
                 v
             );
@@ -594,7 +594,7 @@ mod tests {
     fn test_validate_size_pct_max_out_of_range() {
         let tab = TabConfig {
             size_pct: 0.20,
-            taper: 0.50,
+            taper: 0.57,
             size_pct_max: Some(0.30), // too large
             taper_max: None,
         };
@@ -605,7 +605,7 @@ mod tests {
     fn test_validate_size_pct_max_less_than_min() {
         let tab = TabConfig {
             size_pct: 0.20,
-            taper: 0.50,
+            taper: 0.57,
             size_pct_max: Some(0.15), // less than size_pct
             taper_max: None,
         };
@@ -616,7 +616,7 @@ mod tests {
     fn test_validate_taper_max_out_of_range() {
         let tab = TabConfig {
             size_pct: 0.20,
-            taper: 0.50,
+            taper: 0.57,
             size_pct_max: None,
             taper_max: Some(1.50), // too large
         };
@@ -629,7 +629,7 @@ mod tests {
             size_pct: 0.20,
             taper: 0.80,
             size_pct_max: None,
-            taper_max: Some(0.50), // less than taper
+            taper_max: Some(0.60), // less than taper
         };
         assert!(tab.validate().is_err());
     }
