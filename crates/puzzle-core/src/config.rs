@@ -51,6 +51,14 @@ pub struct TabConfig {
     /// a random taper in [taper, taper_max] range.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub taper_max: Option<f64>,
+    /// Offset of the knob center from the edge midpoint, as a fraction of edge length.
+    /// Range: -0.15..=0.15. Negative = shift left, positive = shift right. Default 0.0.
+    #[serde(default)]
+    pub offset: f64,
+    /// Optional max for per-edge offset randomization. When Some, each edge gets
+    /// a random offset in [offset, offset_max] range. Both must be in -0.15..=0.15.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub offset_max: Option<f64>,
 }
 
 fn default_taper() -> f64 {
@@ -64,6 +72,8 @@ impl Default for TabConfig {
             taper: 0.57,
             size_pct_max: None,
             taper_max: None,
+            offset: 0.0,
+            offset_max: None,
         }
     }
 }
@@ -111,6 +121,26 @@ impl TabConfig {
                 ));
             }
         }
+        if self.offset < -0.15 || self.offset > 0.15 {
+            return Err(format!(
+                "tab offset must be between -0.15 and 0.15, got {}",
+                self.offset
+            ));
+        }
+        if let Some(max) = self.offset_max {
+            if max < -0.15 || max > 0.15 {
+                return Err(format!(
+                    "tab offset_max must be between -0.15 and 0.15, got {}",
+                    max
+                ));
+            }
+            if max < self.offset {
+                return Err(format!(
+                    "tab offset_max ({}) must be >= offset ({})",
+                    max, self.offset
+                ));
+            }
+        }
         Ok(())
     }
 
@@ -132,6 +162,26 @@ impl TabConfig {
             Some(max) => {
                 let lo = self.size_pct.min(safe_max);
                 let hi = max.min(safe_max);
+                if (hi - lo).abs() < 1e-10 {
+                    lo
+                } else {
+                    rng.random_range(lo..=hi)
+                }
+            }
+        }
+    }
+
+    /// Return the effective offset for a single edge, optionally randomized.
+    ///
+    /// When `offset_max` is None, returns the fixed `offset` without consuming
+    /// any RNG values (backward compatible).
+    /// When `offset_max` is Some, returns a random value in [offset, offset_max].
+    pub fn randomize_offset(&self, rng: &mut ChaCha8Rng) -> f64 {
+        match self.offset_max {
+            None => self.offset,
+            Some(max) => {
+                let lo = self.offset;
+                let hi = max;
                 if (hi - lo).abs() < 1e-10 {
                     lo
                 } else {
@@ -402,6 +452,8 @@ mod tests {
                 taper: 0.57,
                 size_pct_max: None,
                 taper_max: None,
+                offset: 0.0,
+                offset_max: None,
             },
             String::new(),
         );
@@ -419,6 +471,8 @@ mod tests {
                 taper: 1.32,
                 size_pct_max: None,
                 taper_max: None,
+                offset: 0.0,
+                offset_max: None,
             },
             String::new(),
         );
@@ -436,6 +490,8 @@ mod tests {
                 taper: 0.57,
                 size_pct_max: Some(0.25),
                 taper_max: Some(1.32),
+                offset: -0.15,
+                offset_max: Some(0.15),
             },
             String::new(),
         );
@@ -469,6 +525,8 @@ mod tests {
             taper: 0.57,
             size_pct_max: Some(0.25),
             taper_max: None,
+            offset: 0.0,
+            offset_max: None,
         };
         let mut rng = create_rng("range-test");
         let mut values = Vec::new();
@@ -511,6 +569,8 @@ mod tests {
             taper: 0.57,
             size_pct_max: None,
             taper_max: Some(1.32),
+            offset: 0.0,
+            offset_max: None,
         };
         let mut rng = create_rng("neck-range-test");
         let mut values = Vec::new();
@@ -540,6 +600,8 @@ mod tests {
             taper: 0.57,
             size_pct_max: Some(0.30), // too large
             taper_max: None,
+            offset: 0.0,
+            offset_max: None,
         };
         assert!(tab.validate().is_err());
     }
@@ -551,6 +613,8 @@ mod tests {
             taper: 0.57,
             size_pct_max: Some(0.15), // less than size_pct
             taper_max: None,
+            offset: 0.0,
+            offset_max: None,
         };
         assert!(tab.validate().is_err());
     }
@@ -562,6 +626,8 @@ mod tests {
             taper: 0.57,
             size_pct_max: None,
             taper_max: Some(1.50), // too large
+            offset: 0.0,
+            offset_max: None,
         };
         assert!(tab.validate().is_err());
     }
@@ -573,6 +639,8 @@ mod tests {
             taper: 0.80,
             size_pct_max: None,
             taper_max: Some(0.60), // less than taper
+            offset: 0.0,
+            offset_max: None,
         };
         assert!(tab.validate().is_err());
     }

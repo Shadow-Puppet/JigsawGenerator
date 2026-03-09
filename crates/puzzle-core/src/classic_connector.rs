@@ -67,8 +67,8 @@ impl ConnectorGenerator for ClassicKnobConnector {
             TabDirection::In => -1.0,
         };
 
-        // Knob is always centered on the actual edge
-        let center = length * 0.5;
+        // Knob center: shifted from midpoint by the offset fraction
+        let center = length * (0.5 + params.offset);
 
         // Knob dimensions: use min(length, cross_length) so both axes produce
         // identically-sized knobs regardless of grid aspect ratio.
@@ -191,6 +191,7 @@ mod tests {
             direction,
             tab_size: 0.25,
             neck_ratio: 0.75,
+            offset: 0.0,
         }
     }
 
@@ -363,6 +364,7 @@ mod tests {
             direction: TabDirection::Out,
             tab_size: 0.15,
             neck_ratio: 0.75,
+            offset: 0.0,
         };
 
         let large_params = EdgeParams {
@@ -371,6 +373,7 @@ mod tests {
             direction: TabDirection::Out,
             tab_size: 0.25,
             neck_ratio: 0.75,
+            offset: 0.0,
         };
 
         let mut rng1 = create_rng("size-test");
@@ -431,6 +434,7 @@ mod tests {
             direction: TabDirection::Out,
             tab_size: 0.25,
             neck_ratio: 0.75,
+            offset: 0.0,
         };
         let h_curves = connector.generate(&h_params, &mut rng);
 
@@ -441,6 +445,7 @@ mod tests {
             direction: TabDirection::Out,
             tab_size: 0.25,
             neck_ratio: 0.75,
+            offset: 0.0,
         };
         let mut rng2 = create_rng("uniform-test");
         let v_curves = connector.generate(&v_params, &mut rng2);
@@ -474,6 +479,7 @@ mod tests {
             direction: TabDirection::Out,
             tab_size: 0.25,
             neck_ratio: 0.75,
+            offset: 0.0,
         };
         let mut rng = create_rng("extreme-test");
         let curves = connector.generate(&params, &mut rng);
@@ -501,6 +507,7 @@ mod tests {
             direction: TabDirection::Out,
             tab_size: 0.25,
             neck_ratio: 0.75,
+            offset: 0.0,
         };
         let mut rng = create_rng("neck-test");
         let curves = connector.generate(&params, &mut rng);

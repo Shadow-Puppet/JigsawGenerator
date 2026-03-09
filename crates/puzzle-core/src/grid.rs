@@ -202,12 +202,14 @@ impl PuzzleGrid {
             }
             let tab_size = self.config.tab.randomize_tab_size(safe_max, &mut rng);
             let neck_ratio = self.config.tab.randomize_neck_ratio(&mut rng);
+            let offset = self.config.tab.randomize_offset(&mut rng);
             let params = EdgeParams {
                 length: edge.length(),
                 cross_length: cell_h,
                 direction: edge.direction,
                 tab_size,
                 neck_ratio,
+                offset,
             };
             let curves = connector.generate(&params, &mut rng);
             edge.connector = Some(curves);
@@ -221,12 +223,14 @@ impl PuzzleGrid {
             }
             let tab_size = self.config.tab.randomize_tab_size(safe_max, &mut rng);
             let neck_ratio = self.config.tab.randomize_neck_ratio(&mut rng);
+            let offset = self.config.tab.randomize_offset(&mut rng);
             let params = EdgeParams {
                 length: edge.length(),
                 cross_length: cell_w,
                 direction: edge.direction,
                 tab_size,
                 neck_ratio,
+                offset,
             };
             let curves = connector.generate(&params, &mut rng);
             edge.connector = Some(curves);

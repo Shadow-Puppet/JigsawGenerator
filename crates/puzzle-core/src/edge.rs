@@ -54,6 +54,9 @@ pub struct EdgeParams {
     /// Neck-to-body width ratio derived from taper (0.5..=1.0).
     /// 1.0 = no taper, 0.5 = maximum taper.
     pub neck_ratio: f64,
+    /// Offset of the knob center from the edge midpoint, as a fraction of edge length.
+    /// 0.0 = centered, positive = shift right, negative = shift left.
+    pub offset: f64,
 }
 
 #[cfg(test)]
