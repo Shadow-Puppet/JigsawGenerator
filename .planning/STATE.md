@@ -108,6 +108,7 @@ Phase 4 [x] Web GUI & Live Preview (2/2 plans)
 - Binary edge data transfer: 36-float fixed stride per edge, zero string parsing; command-prefixed border encoding (quick-015)
 - AABB viewport culling with 35% margin for knob protrusion — only visible edges drawn per frame (quick-015)
 - SVG cached at generation time via thread_local! in WASM; get_cached_svg() for instant download without regeneration (quick-015)
+- Corner radius removed entirely — sharp 90-degree corners only; BorderConfig deleted, simple rectangular border path (quick-017)
 
 ### Research Flags
 - **Phase 3 (Connectors):** Complete. Connector generation + SVG export pipeline fully functional.
@@ -148,13 +149,14 @@ Phase 4 [x] Web GUI & Live Preview (2/2 plans)
 | 014 | Buttery smooth UI: GPU compositing, inline tab max, SVG diffing, rAF throttle, URL debounce, WASM -O3/LTO | 2026-03-07 | 600936d | [14-buttery-smooth-ui-gpu-compositing-inline](./quick/14-buttery-smooth-ui-gpu-compositing-inline/) |
 | 015 | Canvas 2D renderer with viewport culling and binary WASM data transfer | 2026-03-07 | 8157208 | [15-optimize-large-puzzle-performance-for-sm](./quick/15-optimize-large-puzzle-performance-for-sm/) |
 | 016 | Adjust taper parameter range: 0.50..=1.20 to 0.57..=1.32 | 2026-03-09 | 666518c | [16-adjust-taper-parameter-range-min-stays-0](./quick/16-adjust-taper-parameter-range-min-stays-0/) |
+| 017 | Remove corner radius property entirely | 2026-03-09 | 4255ab8 | [17-remove-corner-radius-property-entirely-f](./quick/17-remove-corner-radius-property-entirely-f/) |
 
 ## Session Continuity
 
-**Last session:** 2026-03-09T13:33:00Z
-**Stopped at:** Completed quick task 016: Adjust taper range from 0.50..=1.20 to 0.57..=1.32
-**Next action:** Milestone complete — all 4 phases done, quick-001 through 016 applied
+**Last session:** 2026-03-09T13:50:00Z
+**Stopped at:** Completed quick task 017: Remove corner radius property entirely
+**Next action:** Milestone complete — all 4 phases done, quick-001 through 017 applied
 
 ---
-Last activity: 2026-03-09 - Completed quick task 016: Taper range adjusted to 0.57..=1.32
-*Last updated: 2026-03-09T13:33:00Z*
+Last activity: 2026-03-09 - Completed quick task 017: Corner radius property removed entirely
+*Last updated: 2026-03-09T13:50:00Z*
