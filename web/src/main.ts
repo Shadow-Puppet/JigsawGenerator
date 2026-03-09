@@ -78,13 +78,13 @@ const EDGE_STRIDE = 36;
 function buildConfig(): object {
   const tabConfig: Record<string, unknown> = {
     size_pct: parseFloat(tabSlider.value),
-    taper: 0.5 + parseFloat(taperSlider.value) * 0.7,
+    taper: 0.57 + parseFloat(taperSlider.value) * 0.75,
   };
   if (tabRandomize.checked) {
     tabConfig.size_pct_max = parseFloat(tabMaxSlider.value);
   }
   if (taperRandomize.checked) {
-    tabConfig.taper_max = 0.5 + parseFloat(taperMaxSlider.value) * 0.7;
+    tabConfig.taper_max = 0.57 + parseFloat(taperMaxSlider.value) * 0.75;
   }
   return {
     rows: parseInt(rowsInput.value, 10),
@@ -337,7 +337,7 @@ function drawPuzzle(): void {
 
   // Style
   ctx.strokeStyle = "#000000";
-  ctx.lineWidth = 0.2 / scale;
+  ctx.lineWidth = Math.max(1, 0.2 * scale) / scale;
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
 
