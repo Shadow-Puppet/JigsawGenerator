@@ -31,6 +31,12 @@ let taperMaxSlider: HTMLInputElement;
 let tabTrack: HTMLElement;
 let taperTrack: HTMLElement;
 
+let offsetSlider: HTMLInputElement;
+let offsetReadout: HTMLElement;
+let offsetRandomize: HTMLInputElement;
+let offsetMaxSlider: HTMLInputElement;
+let offsetTrack: HTMLElement;
+
 let pieceTargetInput: HTMLInputElement;
 let pieceSizeWarning: HTMLElement;
 let gridLockBtn: HTMLElement;
@@ -84,6 +90,10 @@ function buildConfig(): object {
   if (taperRandomize.checked) {
     tabConfig.taper_max = 0.57 + parseFloat(taperMaxSlider.value) * 0.75;
   }
+  tabConfig.offset = parseFloat(offsetSlider.value);
+  if (offsetRandomize.checked) {
+    tabConfig.offset_max = parseFloat(offsetMaxSlider.value);
+  }
   return {
     rows: parseInt(rowsInput.value, 10),
     cols: parseInt(colsInput.value, 10),
@@ -135,6 +145,17 @@ function loadFromURL(): boolean {
     taperMaxSlider.style.display = "";
   }
 
+  // Restore offset state
+  const offsetVal = parseInt(params.get("off") ?? "0", 10) / 100;
+  const offset = Math.max(-0.15, Math.min(0.15, offsetVal));
+  offsetSlider.value = String(offset);
+  if (params.get("offr") === "1") {
+    offsetRandomize.checked = true;
+    const offMax = Math.max(-0.15, Math.min(0.15, parseInt(params.get("offmax") ?? "15", 10) / 100));
+    offsetMaxSlider.value = String(offMax);
+    offsetMaxSlider.style.display = "";
+  }
+
   return true;
 }
 
@@ -157,6 +178,11 @@ function updateURL(): void {
   if (taperRandomize.checked) {
     params.set("taperr", "1");
     params.set("tapermax", String(Math.round(parseFloat(taperMaxSlider.value) * 100)));
+  }
+  params.set("off", String(Math.round(parseFloat(offsetSlider.value) * 100)));
+  if (offsetRandomize.checked) {
+    params.set("offr", "1");
+    params.set("offmax", String(Math.round(parseFloat(offsetMaxSlider.value) * 100)));
   }
   history.replaceState(null, "", "?" + params.toString());
 }
@@ -469,8 +495,14 @@ function updateReadouts(): void {
   } else {
     taperReadout.textContent = parseFloat(taperSlider.value).toFixed(2);
   }
+  if (offsetRandomize.checked) {
+    offsetReadout.textContent = `${parseFloat(offsetSlider.value).toFixed(2)}-${parseFloat(offsetMaxSlider.value).toFixed(2)}`;
+  } else {
+    offsetReadout.textContent = parseFloat(offsetSlider.value).toFixed(2);
+  }
   updateRangeHighlight(tabSlider, tabMaxSlider, tabTrack, tabRandomize.checked);
   updateRangeHighlight(taperSlider, taperMaxSlider, taperTrack, taperRandomize.checked);
+  updateRangeHighlight(offsetSlider, offsetMaxSlider, offsetTrack, offsetRandomize.checked);
 }
 
 // ─── Randomize Toggle Helpers ────────────────────────────────
@@ -758,6 +790,12 @@ async function main(): Promise<void> {
   tabTrack = document.getElementById("tab-track")!;
   taperTrack = document.getElementById("taper-track")!;
 
+  offsetSlider = document.getElementById("offset") as HTMLInputElement;
+  offsetReadout = document.getElementById("offset-readout")!;
+  offsetRandomize = document.getElementById("offset-randomize") as HTMLInputElement;
+  offsetMaxSlider = document.getElementById("offset-max") as HTMLInputElement;
+  offsetTrack = document.getElementById("offset-track")!;
+
   pieceTargetInput = document.getElementById("piece-target") as HTMLInputElement;
   pieceSizeWarning = document.getElementById("piece-size-warning")!;
   gridLockBtn = document.getElementById("grid-lock")!;
@@ -837,7 +875,7 @@ async function main(): Promise<void> {
   });
 
   // Range sliders — update readout + regenerate
-  const sliders = [tabSlider, taperSlider];
+  const sliders = [tabSlider, taperSlider, offsetSlider];
   for (const slider of sliders) {
     slider.addEventListener("input", () => {
       // When randomize is on, clamp min <= max
@@ -846,6 +884,9 @@ async function main(): Promise<void> {
       }
       if (slider === taperSlider && taperRandomize.checked) {
         clampMinMax(taperSlider, taperMaxSlider);
+      }
+      if (slider === offsetSlider && offsetRandomize.checked) {
+        clampMinMax(offsetSlider, offsetMaxSlider);
       }
       updateReadouts();
       scheduleGenerate();
@@ -863,6 +904,11 @@ async function main(): Promise<void> {
     updateReadouts();
     scheduleGenerate();
   });
+  offsetMaxSlider.addEventListener("input", () => {
+    clampMaxMin(offsetSlider, offsetMaxSlider);
+    updateReadouts();
+    scheduleGenerate();
+  });
 
   // Randomize checkboxes
   tabRandomize.addEventListener("change", () => {
@@ -870,6 +916,9 @@ async function main(): Promise<void> {
   });
   taperRandomize.addEventListener("change", () => {
     toggleRandomize(taperRandomize, taperMaxSlider, taperSlider);
+  });
+  offsetRandomize.addEventListener("change", () => {
+    toggleRandomize(offsetRandomize, offsetMaxSlider, offsetSlider);
   });
 
   // Unit select — convert dimensions and recalculate tab max
