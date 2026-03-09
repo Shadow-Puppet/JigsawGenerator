@@ -81,7 +81,7 @@ Phase 4 [x] Web GUI & Live Preview (2/2 plans)
 - CSS stroke-width override for screen display; downloaded SVGs preserve hairline strokes for laser cutting
 - URL param abbreviations: w/h, mm/in, tab/jitter as integer percentages for compact shareable URLs
 - Taper range adjusted to 0.30..=1.10; old URL params clamped for backward compat (quick-001)
-- Taper slider normalized to 0-1 user-facing range with linear interpolation to internal 0.5-1.2 (quick-002)
+- Taper slider normalized to 0-1 user-facing range with linear interpolation to internal 0.57-1.32 (quick-002, updated quick-016)
 - Kerf feature removed entirely — offset algorithm never worked correctly (quick-009, supersedes quick-008)
 - Max tab size capped at 25% (was 45%) to prevent oversized/overlapping connectors (quick-003)
 - safe_tab_max() must clamp inputs before validation — otherwise out-of-range slider values cause validation failure, silently preventing max updates (quick-004)
@@ -147,13 +147,14 @@ Phase 4 [x] Web GUI & Live Preview (2/2 plans)
 | 013 | Optimize SVG rendering performance for large puzzles | 2026-03-05 | 3f25219 | [13-optimize-svg-rendering-performance-for-l](./quick/13-optimize-svg-rendering-performance-for-l/) |
 | 014 | Buttery smooth UI: GPU compositing, inline tab max, SVG diffing, rAF throttle, URL debounce, WASM -O3/LTO | 2026-03-07 | 600936d | [14-buttery-smooth-ui-gpu-compositing-inline](./quick/14-buttery-smooth-ui-gpu-compositing-inline/) |
 | 015 | Canvas 2D renderer with viewport culling and binary WASM data transfer | 2026-03-07 | 8157208 | [15-optimize-large-puzzle-performance-for-sm](./quick/15-optimize-large-puzzle-performance-for-sm/) |
+| 016 | Adjust taper parameter range: 0.50..=1.20 to 0.57..=1.32 | 2026-03-09 | 666518c | [16-adjust-taper-parameter-range-min-stays-0](./quick/16-adjust-taper-parameter-range-min-stays-0/) |
 
 ## Session Continuity
 
-**Last session:** 2026-03-07T16:24:48Z
-**Stopped at:** Completed quick task 015: Canvas 2D renderer with viewport culling and binary WASM transfer
-**Next action:** Milestone complete — all 4 phases done, quick-001 through 015 applied
+**Last session:** 2026-03-09T13:33:00Z
+**Stopped at:** Completed quick task 016: Adjust taper range from 0.50..=1.20 to 0.57..=1.32
+**Next action:** Milestone complete — all 4 phases done, quick-001 through 016 applied
 
 ---
-Last activity: 2026-03-07 - Completed quick task 015: Canvas 2D + viewport culling + binary WASM transfer
-*Last updated: 2026-03-07T16:24:48Z*
+Last activity: 2026-03-09 - Completed quick task 016: Taper range adjusted to 0.57..=1.32
+*Last updated: 2026-03-09T13:33:00Z*
