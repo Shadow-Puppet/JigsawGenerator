@@ -150,13 +150,14 @@ Phase 4 [x] Web GUI & Live Preview (2/2 plans)
 | 015 | Canvas 2D renderer with viewport culling and binary WASM data transfer | 2026-03-07 | 8157208 | [15-optimize-large-puzzle-performance-for-sm](./quick/15-optimize-large-puzzle-performance-for-sm/) |
 | 016 | Adjust taper parameter range: 0.50..=1.20 to 0.57..=1.32 | 2026-03-09 | 666518c | [16-adjust-taper-parameter-range-min-stays-0](./quick/16-adjust-taper-parameter-range-min-stays-0/) |
 | 017 | Remove corner radius property entirely | 2026-03-09 | 4255ab8 | [17-remove-corner-radius-property-entirely-f](./quick/17-remove-corner-radius-property-entirely-f/) |
+| 018 | Center-aware range slider toggle behavior | 2026-03-09 | 4e1065f | [18-change-range-slider-behavior-based-on-si](./quick/18-change-range-slider-behavior-based-on-si/) |
 
 ## Session Continuity
 
-**Last session:** 2026-03-09T13:50:00Z
-**Stopped at:** Completed quick task 017: Remove corner radius property entirely
-**Next action:** Milestone complete — all 4 phases done, quick-001 through 017 applied
+**Last session:** 2026-03-09T14:01:00Z
+**Stopped at:** Completed quick task 018: Center-aware range slider toggle behavior
+**Next action:** Milestone complete — all 4 phases done, quick-001 through 018 applied
 
 ---
-Last activity: 2026-03-09 - Completed quick task 017: Corner radius property removed entirely
-*Last updated: 2026-03-09T13:50:00Z*
+Last activity: 2026-03-09 - Completed quick task 018: Center-aware range slider toggle behavior
+*Last updated: 2026-03-09T14:01:00Z*
