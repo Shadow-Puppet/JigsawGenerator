@@ -95,7 +95,6 @@ struct GridResponse {
 ///   "width": 297.0, "height": 210.0,
 ///   "unit": "Millimeters",
 ///   "tab": { "size_pct": 0.25, "taper": 0.5 },
-///   "border": { "corner_radius": 2.0 },
 ///   "seed": "my-puzzle-seed"
 /// }
 /// ```
@@ -375,7 +374,7 @@ mod tests {
 
     #[test]
     fn test_generate_grid_valid_config() {
-        let config_json = r#"{"rows":6,"cols":8,"width":297.0,"height":210.0,"unit":"Millimeters","tab":{"size_pct":0.25},"border":{"corner_radius":2.0},"seed":"test-seed"}"#;
+        let config_json = r#"{"rows":6,"cols":8,"width":297.0,"height":210.0,"unit":"Millimeters","tab":{"size_pct":0.25},"seed":"test-seed"}"#;
         let result = generate_grid(config_json);
 
         // Should be valid JSON, not an error
@@ -404,7 +403,7 @@ mod tests {
 
     #[test]
     fn test_generate_grid_deterministic() {
-        let config_json = r#"{"rows":4,"cols":5,"width":200.0,"height":150.0,"unit":"Millimeters","tab":{"size_pct":0.25},"border":{"corner_radius":2.0},"seed":"determinism-test"}"#;
+        let config_json = r#"{"rows":4,"cols":5,"width":200.0,"height":150.0,"unit":"Millimeters","tab":{"size_pct":0.25},"seed":"determinism-test"}"#;
         let result1 = generate_grid(config_json);
         let result2 = generate_grid(config_json);
 
@@ -413,7 +412,7 @@ mod tests {
 
     #[test]
     fn test_generate_grid_empty_seed_uses_default() {
-        let config_json = r#"{"rows":3,"cols":4,"width":200.0,"height":150.0,"unit":"Millimeters","tab":{"size_pct":0.25},"border":{"corner_radius":2.0},"seed":""}"#;
+        let config_json = r#"{"rows":3,"cols":4,"width":200.0,"height":150.0,"unit":"Millimeters","tab":{"size_pct":0.25},"seed":""}"#;
         let result = generate_grid(config_json);
         assert!(!result.contains(r#""error""#), "Got error: {}", result);
 
@@ -430,14 +429,14 @@ mod tests {
     #[test]
     fn test_generate_grid_invalid_config() {
         // rows=1 is below minimum (2)
-        let config_json = r#"{"rows":1,"cols":4,"width":200.0,"height":150.0,"unit":"Millimeters","tab":{"size_pct":0.25},"border":{"corner_radius":2.0},"seed":"test"}"#;
+        let config_json = r#"{"rows":1,"cols":4,"width":200.0,"height":150.0,"unit":"Millimeters","tab":{"size_pct":0.25},"seed":"test"}"#;
         let result = generate_grid(config_json);
         assert!(result.contains(r#""error""#));
     }
 
     #[test]
     fn test_generate_grid_piece_types_correct() {
-        let config_json = r#"{"rows":3,"cols":4,"width":200.0,"height":150.0,"unit":"Millimeters","tab":{"size_pct":0.25},"border":{"corner_radius":2.0},"seed":"piece-types"}"#;
+        let config_json = r#"{"rows":3,"cols":4,"width":200.0,"height":150.0,"unit":"Millimeters","tab":{"size_pct":0.25},"seed":"piece-types"}"#;
         let result = generate_grid(config_json);
         let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
         let pieces = parsed["pieces"].as_array().unwrap();
@@ -460,7 +459,7 @@ mod tests {
 
     #[test]
     fn test_generate_grid_edge_counts() {
-        let config_json = r#"{"rows":3,"cols":4,"width":200.0,"height":150.0,"unit":"Millimeters","tab":{"size_pct":0.25},"border":{"corner_radius":2.0},"seed":"edge-counts"}"#;
+        let config_json = r#"{"rows":3,"cols":4,"width":200.0,"height":150.0,"unit":"Millimeters","tab":{"size_pct":0.25},"seed":"edge-counts"}"#;
         let result = generate_grid(config_json);
         let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
 
@@ -484,7 +483,7 @@ mod tests {
 
     #[test]
     fn test_generate_grid_json_roundtrip() {
-        let config_json = r#"{"rows":6,"cols":8,"width":297.0,"height":210.0,"unit":"Millimeters","tab":{"size_pct":0.25},"border":{"corner_radius":2.0},"seed":"test-seed"}"#;
+        let config_json = r#"{"rows":6,"cols":8,"width":297.0,"height":210.0,"unit":"Millimeters","tab":{"size_pct":0.25},"seed":"test-seed"}"#;
         let result = generate_grid(config_json);
 
         // Verify it's valid JSON
@@ -510,7 +509,7 @@ mod tests {
 
     #[test]
     fn test_generate_svg_returns_svg() {
-        let config_json = r#"{"rows":3,"cols":4,"width":200.0,"height":150.0,"unit":"Millimeters","tab":{"size_pct":0.25},"border":{"corner_radius":2.0},"seed":"svg-test"}"#;
+        let config_json = r#"{"rows":3,"cols":4,"width":200.0,"height":150.0,"unit":"Millimeters","tab":{"size_pct":0.25},"seed":"svg-test"}"#;
         let result = generate_svg(config_json);
         assert!(
             result.starts_with("<svg"),
@@ -523,7 +522,7 @@ mod tests {
 
     #[test]
     fn test_generate_svg_has_connectors() {
-        let config_json = r#"{"rows":3,"cols":4,"width":200.0,"height":150.0,"unit":"Millimeters","tab":{"size_pct":0.25},"border":{"corner_radius":2.0},"seed":"conn-svg"}"#;
+        let config_json = r#"{"rows":3,"cols":4,"width":200.0,"height":150.0,"unit":"Millimeters","tab":{"size_pct":0.25},"seed":"conn-svg"}"#;
         let result = generate_svg(config_json);
         // Extract path data
         let d_start = result.find("d='").expect("should have d attribute") + 3;
@@ -537,7 +536,7 @@ mod tests {
 
     #[test]
     fn test_generate_svg_deterministic() {
-        let config_json = r#"{"rows":3,"cols":4,"width":200.0,"height":150.0,"unit":"Millimeters","tab":{"size_pct":0.25},"border":{"corner_radius":2.0},"seed":"determ-svg"}"#;
+        let config_json = r#"{"rows":3,"cols":4,"width":200.0,"height":150.0,"unit":"Millimeters","tab":{"size_pct":0.25},"seed":"determ-svg"}"#;
         let svg1 = generate_svg(config_json);
         let svg2 = generate_svg(config_json);
         assert_eq!(svg1, svg2, "same config must produce identical SVG");

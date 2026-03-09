@@ -167,7 +167,6 @@ mod tests {
             height: 150.0,
             unit: Unit::Millimeters,
             tab: TabConfig::default(),
-            border: BorderConfig::default(),
             seed: seed.to_string(),
         }
     }

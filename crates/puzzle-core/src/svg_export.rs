@@ -1,6 +1,4 @@
-use std::f64::consts::PI;
-
-use kurbo::{Affine, Arc, BezPath, PathEl, Point, Vec2};
+use kurbo::{Affine, BezPath, PathEl, Point};
 
 use crate::grid::PuzzleGrid;
 
@@ -14,7 +12,7 @@ use crate::grid::PuzzleGrid;
 /// - A single `<path>` element with all cut lines
 /// - Hairline black stroke, no fill
 /// - Absolute coordinates only (M, L, C, Z)
-/// - Border as a closed subpath with rounded corners
+/// - Border as a closed rectangular subpath with sharp corners
 /// - Internal edges as open subpaths with connector curves
 pub fn generate_svg(grid: &PuzzleGrid) -> String {
     let border = build_border_path(grid);
@@ -39,8 +37,7 @@ pub fn generate_svg(grid: &PuzzleGrid) -> String {
 /// Construct the puzzle cut path as a single BezPath.
 ///
 /// The path contains:
-/// 1. A closed border subpath with straight edges and quarter-circle
-///    rounded corners at the 4 puzzle corners
+/// 1. A closed rectangular border subpath with sharp corners
 /// 2. Open subpaths for each internal edge, with connector bezier curves
 ///    transformed from edge-local to global coordinates
 #[allow(dead_code)]
@@ -61,56 +58,20 @@ fn build_puzzle_path(grid: &PuzzleGrid) -> BezPath {
     path
 }
 
-/// Construct the border as a closed BezPath with rounded corners.
+/// Construct the border as a closed rectangular BezPath.
 ///
-/// Walk clockwise: top → right → bottom → left with quarter-circle arcs
-/// at each corner. Returns a single closed subpath.
+/// Walk clockwise: top → right → bottom → left with sharp 90-degree
+/// corners. Returns a single closed subpath.
 pub(crate) fn build_border_path(grid: &PuzzleGrid) -> BezPath {
     let mut path = BezPath::new();
 
     let w = grid.config.width;
     let h = grid.config.height;
-    let r = grid.config.border.corner_radius;
 
-    // Clamp radius to avoid exceeding half the smallest dimension
-    let r = r.min(w / 2.0).min(h / 2.0);
-
-    // Start at top edge, after top-left corner
-    path.move_to(Point::new(r, 0.0));
-
-    // Top edge: straight line to before top-right corner
-    path.line_to(Point::new(w - r, 0.0));
-
-    // Top-right corner arc (quarter circle, clockwise)
-    if r > 0.0 {
-        append_quarter_arc(&mut path, Point::new(w - r, r), r, -PI / 2.0, PI / 2.0);
-    }
-
-    // Right edge: straight line to before bottom-right corner
-    path.line_to(Point::new(w, h - r));
-
-    // Bottom-right corner arc
-    if r > 0.0 {
-        append_quarter_arc(&mut path, Point::new(w - r, h - r), r, 0.0, PI / 2.0);
-    }
-
-    // Bottom edge: straight line to before bottom-left corner
-    path.line_to(Point::new(r, h));
-
-    // Bottom-left corner arc
-    if r > 0.0 {
-        append_quarter_arc(&mut path, Point::new(r, h - r), r, PI / 2.0, PI / 2.0);
-    }
-
-    // Left edge: straight line to before top-left corner
-    path.line_to(Point::new(0.0, r));
-
-    // Top-left corner arc
-    if r > 0.0 {
-        append_quarter_arc(&mut path, Point::new(r, r), r, PI, PI / 2.0);
-    }
-
-    // Close the border
+    path.move_to(Point::new(0.0, 0.0));
+    path.line_to(Point::new(w, 0.0));
+    path.line_to(Point::new(w, h));
+    path.line_to(Point::new(0.0, h));
     path.close_path();
 
     path
@@ -181,31 +142,6 @@ pub(crate) fn edge_transform(start: Point, end: Point) -> Affine {
     Affine::translate(start.to_vec2()) * Affine::rotate(angle)
 }
 
-/// Append a quarter-circle arc to the path using cubic bezier approximation.
-///
-/// `center`: arc center point
-/// `radius`: arc radius
-/// `start_angle`: angle where the arc starts (radians)
-/// `sweep_angle`: angle to sweep (positive = clockwise in SVG coords)
-fn append_quarter_arc(
-    path: &mut BezPath,
-    center: Point,
-    radius: f64,
-    start_angle: f64,
-    sweep_angle: f64,
-) {
-    let arc = Arc::new(
-        center,
-        Vec2::new(radius, radius),
-        start_angle,
-        sweep_angle,
-        0.0,
-    );
-    arc.to_cubic_beziers(0.01, |p1, p2, p3| {
-        path.curve_to(p1, p2, p3);
-    });
-}
-
 /// Wrap SVG path data in a complete SVG document.
 ///
 /// Output format:
@@ -239,7 +175,6 @@ mod tests {
             height: 150.0,
             unit: Unit::Millimeters,
             tab: TabConfig::default(),
-            border: BorderConfig::default(),
             seed: seed.to_string(),
         }
     }

@@ -164,33 +164,6 @@ impl TabConfig {
     }
 }
 
-/// Border configuration for the puzzle outline.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BorderConfig {
-    /// Corner radius in millimeters (0.0..=10.0, default 2.0).
-    /// 0.0 = sharp corners, 2.0 = typical laser-cutting-friendly radius.
-    pub corner_radius: f64,
-}
-
-impl Default for BorderConfig {
-    fn default() -> Self {
-        Self { corner_radius: 2.0 }
-    }
-}
-
-impl BorderConfig {
-    /// Validate that corner radius is within acceptable bounds.
-    pub fn validate(&self) -> Result<(), String> {
-        if self.corner_radius < 0.0 || self.corner_radius > 10.0 {
-            return Err(format!(
-                "border corner_radius must be between 0.0 and 10.0, got {}",
-                self.corner_radius
-            ));
-        }
-        Ok(())
-    }
-}
-
 /// Top-level puzzle configuration.
 ///
 /// All dimensions are stored in millimeters internally.
@@ -210,8 +183,6 @@ pub struct PuzzleConfig {
     pub unit: Unit,
     /// Tab/knob configuration.
     pub tab: TabConfig,
-    /// Border configuration.
-    pub border: BorderConfig,
     /// User seed string (empty = auto-generate).
     pub seed: String,
 }
@@ -225,7 +196,6 @@ impl Default for PuzzleConfig {
             height: 210.0,
             unit: Unit::Millimeters,
             tab: TabConfig::default(),
-            border: BorderConfig::default(),
             seed: String::new(),
         }
     }
@@ -249,7 +219,6 @@ impl PuzzleConfig {
             return Err(format!("height must be positive, got {}", self.height));
         }
         self.tab.validate()?;
-        self.border.validate()?;
         Ok(())
     }
 
@@ -264,7 +233,6 @@ impl PuzzleConfig {
         height: f64,
         unit: Unit,
         tab: TabConfig,
-        border: BorderConfig,
         seed: String,
     ) -> Result<Self, String> {
         let config = Self {
@@ -274,7 +242,6 @@ impl PuzzleConfig {
             height: unit.to_mm(height),
             unit,
             tab,
-            border,
             seed,
         };
         config.validate()?;
@@ -374,20 +341,6 @@ mod tests {
     }
 
     #[test]
-    fn test_validate_border_negative() {
-        let mut config = PuzzleConfig::default();
-        config.border.corner_radius = -1.0;
-        assert!(config.validate().is_err());
-    }
-
-    #[test]
-    fn test_validate_border_too_large() {
-        let mut config = PuzzleConfig::default();
-        config.border.corner_radius = 11.0;
-        assert!(config.validate().is_err());
-    }
-
-    #[test]
     fn test_from_input_inches_converts() {
         let config = PuzzleConfig::from_input(
             4,
@@ -396,7 +349,6 @@ mod tests {
             8.0,
             Unit::Inches,
             TabConfig::default(),
-            BorderConfig::default(),
             "test".to_string(),
         )
         .unwrap();
@@ -414,7 +366,6 @@ mod tests {
             150.0,
             Unit::Millimeters,
             TabConfig::default(),
-            BorderConfig::default(),
             String::new(),
         )
         .unwrap();
@@ -432,7 +383,6 @@ mod tests {
             150.0,
             Unit::Millimeters,
             TabConfig::default(),
-            BorderConfig::default(),
             String::new(),
         );
         assert!(result.is_err());
@@ -453,7 +403,6 @@ mod tests {
                 size_pct_max: None,
                 taper_max: None,
             },
-            BorderConfig { corner_radius: 0.0 },
             String::new(),
         );
         assert!(config.is_ok());
@@ -471,9 +420,6 @@ mod tests {
                 size_pct_max: None,
                 taper_max: None,
             },
-            BorderConfig {
-                corner_radius: 10.0,
-            },
             String::new(),
         );
         assert!(config.is_ok());
@@ -490,9 +436,6 @@ mod tests {
                 taper: 0.57,
                 size_pct_max: Some(0.25),
                 taper_max: Some(1.32),
-            },
-            BorderConfig {
-                corner_radius: 10.0,
             },
             String::new(),
         );
