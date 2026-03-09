@@ -482,18 +482,18 @@ function toggleRandomize(
 ): void {
   if (checkbox.checked) {
     maxSlider.style.display = "";
-    // Ensure max > min (at least one step apart)
-    const step = parseFloat(minSlider.step) || 0.01;
-    const minVal = parseFloat(minSlider.value);
-    const maxVal = parseFloat(maxSlider.value);
-    const sliderMax = parseFloat(maxSlider.max);
-    if (maxVal <= minVal) {
-      if (minVal + step <= sliderMax) {
-        maxSlider.value = String(minVal + step);
-      } else {
-        minSlider.value = String(sliderMax - step);
-        maxSlider.value = String(sliderMax);
-      }
+    // Center-aware knob placement
+    const currentValue = parseFloat(minSlider.value);
+    const sliderMin = parseFloat(minSlider.min);
+    const sliderMax = parseFloat(minSlider.max);
+    const midpoint = (sliderMin + sliderMax) / 2;
+    if (currentValue < midpoint) {
+      // Left of center: keep value as min, max knob goes to slider maximum
+      maxSlider.value = String(sliderMax);
+    } else {
+      // Right of center (or at midpoint): value becomes max, min knob goes to slider minimum
+      maxSlider.value = String(currentValue);
+      minSlider.value = String(sliderMin);
     }
   } else {
     maxSlider.style.display = "none";
