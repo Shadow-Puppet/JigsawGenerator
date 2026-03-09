@@ -18,14 +18,12 @@ let heightInput: HTMLInputElement;
 let unitSelect: HTMLSelectElement;
 let tabSlider: HTMLInputElement;
 let taperSlider: HTMLInputElement;
-let radiusSlider: HTMLInputElement;
 let seedInput: HTMLInputElement;
 let pieceCount: HTMLElement;
 let errorDisplay: HTMLElement;
 
 let tabReadout: HTMLElement;
 let taperReadout: HTMLElement;
-let radiusReadout: HTMLElement;
 let tabRandomize: HTMLInputElement;
 let tabMaxSlider: HTMLInputElement;
 let taperRandomize: HTMLInputElement;
@@ -93,7 +91,6 @@ function buildConfig(): object {
     height: parseFloat(heightInput.value),
     unit: unitSelect.value,
     tab: tabConfig,
-    border: { corner_radius: parseFloat(radiusSlider.value) },
     seed: seedInput.value,
   };
 }
@@ -111,7 +108,6 @@ function loadFromURL(): boolean {
   const unitParam = params.get("unit") ?? "mm";
   const unit = unitParam === "in" ? "Inches" : "Millimeters";
   const tab = Math.max(0.15, Math.min(0.25, parseInt(params.get("tab") ?? "25", 10) / 100));
-  const radius = parseFloat(params.get("radius") ?? "2");
   const taperUser = parseInt(params.get("taper") ?? "0", 10) / 100;
   const taper = Math.max(0, Math.min(1, taperUser));
   const seed = params.get("seed") ?? "";
@@ -123,7 +119,6 @@ function loadFromURL(): boolean {
   unitSelect.value = unit;
   tabSlider.value = String(tab);
   taperSlider.value = String(taper);
-  radiusSlider.value = String(radius);
   seedInput.value = seed || randomSeed();
 
   // Restore randomize state
@@ -146,7 +141,6 @@ function loadFromURL(): boolean {
 function updateURL(): void {
   const config = buildConfig() as Record<string, unknown>;
   const tabObj = config.tab as Record<string, number>;
-  const borderObj = config.border as { corner_radius: number };
   const params = new URLSearchParams();
   params.set("rows", String(config.rows));
   params.set("cols", String(config.cols));
@@ -155,7 +149,6 @@ function updateURL(): void {
   params.set("unit", config.unit === "Inches" ? "in" : "mm");
   params.set("tab", String(Math.round(tabObj.size_pct * 100)));
   params.set("taper", String(Math.round(parseFloat(taperSlider.value) * 100)));
-  params.set("radius", String(borderObj.corner_radius));
   params.set("seed", String(config.seed));
   if (tabRandomize.checked) {
     params.set("tabr", "1");
@@ -476,7 +469,6 @@ function updateReadouts(): void {
   } else {
     taperReadout.textContent = parseFloat(taperSlider.value).toFixed(2);
   }
-  radiusReadout.textContent = parseFloat(radiusSlider.value).toFixed(1);
   updateRangeHighlight(tabSlider, tabMaxSlider, tabTrack, tabRandomize.checked);
   updateRangeHighlight(taperSlider, taperMaxSlider, taperTrack, taperRandomize.checked);
 }
@@ -753,14 +745,12 @@ async function main(): Promise<void> {
   unitSelect = document.getElementById("unit") as HTMLSelectElement;
   tabSlider = document.getElementById("tab") as HTMLInputElement;
   taperSlider = document.getElementById("taper") as HTMLInputElement;
-  radiusSlider = document.getElementById("radius") as HTMLInputElement;
   seedInput = document.getElementById("seed") as HTMLInputElement;
   pieceCount = document.getElementById("piece-count")!;
   errorDisplay = document.getElementById("error-display")!;
 
   tabReadout = document.getElementById("tab-readout")!;
   taperReadout = document.getElementById("taper-readout")!;
-  radiusReadout = document.getElementById("radius-readout")!;
   tabRandomize = document.getElementById("tab-randomize") as HTMLInputElement;
   tabMaxSlider = document.getElementById("tab-max") as HTMLInputElement;
   taperRandomize = document.getElementById("taper-randomize") as HTMLInputElement;
@@ -847,7 +837,7 @@ async function main(): Promise<void> {
   });
 
   // Range sliders — update readout + regenerate
-  const sliders = [tabSlider, taperSlider, radiusSlider];
+  const sliders = [tabSlider, taperSlider];
   for (const slider of sliders) {
     slider.addEventListener("input", () => {
       // When randomize is on, clamp min <= max
