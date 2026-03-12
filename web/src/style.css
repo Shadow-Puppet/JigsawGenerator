@@ -98,16 +98,32 @@ body {
   display: none;
 }
 
-.pill-icon {
-  font-size: 0.7rem;
+svg.pill-icon {
+  width: 14px;
+  height: 14px;
   opacity: 0.4;
-  filter: grayscale(1);
-  line-height: 1;
+  color: currentColor;
   transition: opacity 0.15s;
+  flex-shrink: 0;
 }
 
-.pill-toggle.active .pill-icon {
-  opacity: 0.8;
+.pill-toggle.active svg.pill-icon {
+  opacity: 0.85;
+}
+
+/* Lock shackle opens when unlocked (default), closes when locked (.active) */
+.pill-toggle .lock-shackle {
+  transform: translateY(0);
+  transition: transform 0.2s;
+}
+
+.pill-toggle.active .lock-shackle {
+  transform: translate(0, -1px);
+}
+
+.pill-toggle-sm svg.pill-icon {
+  width: 12px;
+  height: 12px;
 }
 
 .pill-track {
@@ -248,7 +264,7 @@ select:focus {
 .slider-label {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
+  align-items: center;
   margin-bottom: 0.25rem;
 }
 

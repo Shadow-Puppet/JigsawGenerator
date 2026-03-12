@@ -633,8 +633,13 @@ function toggleLock(checkbox: HTMLInputElement, label: string): boolean {
   const active = checkbox.checked;
   const pill = checkbox.closest('.pill-toggle')!;
   pill.classList.toggle('active', active);
-  const icon = pill.querySelector('.pill-icon')!;
-  icon.innerHTML = active ? '\u{1F512}' : '\u{1F513}';
+  // Swap lock shackle between open (unlocked) and closed (locked)
+  const shackle = pill.querySelector('.lock-shackle') as SVGPathElement | null;
+  if (shackle) {
+    shackle.setAttribute('d', active
+      ? 'M5 7V5a3 3 0 0 1 6 0v2'   // closed shackle
+      : 'M5 7V5a3 3 0 0 1 6 0');    // open shackle
+  }
   pill.setAttribute('title', active ? `Unlock ${label}` : `Lock ${label}`);
   return active;
 }
