@@ -109,7 +109,10 @@ Phase 4 [x] Web GUI & Live Preview (2/2 plans)
 - AABB viewport culling with 35% margin for knob protrusion — only visible edges drawn per frame (quick-015)
 - SVG cached at generation time via thread_local! in WASM; get_cached_svg() for instant download without regeneration (quick-015)
 - Corner radius removed entirely — sharp 90-degree corners only; BorderConfig deleted, simple rectangular border path (quick-017)
-- Tab offset slider: -0.15..=0.15 fraction shifts knob center from midpoint; center = length*(0.5+offset); per-edge randomize via offset_max (quick-019)
+- Tab offset slider: 0.0..=0.35 symmetric random range; each edge gets random offset in [-X, +X]; center = length*(0.5+offset); 0 = all centered (quick-019, simplified to symmetric random quick-020)
+- Pill-shaped toggle switches replace old button/checkbox toggles for lock and randomize controls (quick-020)
+- Inline SVG icons (outlined padlock, die face) instead of emoji — matches Web Awesome aesthetic, zero dependencies (quick-020)
+- Max tab size reduced from 25% to 20% — prevents oversized connectors (quick-020, supersedes quick-003)
 
 ### Research Flags
 - **Phase 3 (Connectors):** Complete. Connector generation + SVG export pipeline fully functional.
@@ -153,13 +156,14 @@ Phase 4 [x] Web GUI & Live Preview (2/2 plans)
 | 017 | Remove corner radius property entirely | 2026-03-09 | 4255ab8 | [17-remove-corner-radius-property-entirely-f](./quick/17-remove-corner-radius-property-entirely-f/) |
 | 018 | Center-aware range slider toggle behavior | 2026-03-09 | 4e1065f | [18-change-range-slider-behavior-based-on-si](./quick/18-change-range-slider-behavior-based-on-si/) |
 | 019 | Add tab offset slider that shifts knob position along edge | 2026-03-09 | a1be0a9 | [19-add-tab-offset-slider-that-moves-the-tab](./quick/19-add-tab-offset-slider-that-moves-the-tab/) |
+| 020 | Restyle lock and randomize toggles as pill switches with SVG icons, cap tab max at 20% | 2026-03-12 | 1944631 | [20-restyle-lock-and-random-range-toggles-as](./quick/20-restyle-lock-and-random-range-toggles-as/) |
 
 ## Session Continuity
 
-**Last session:** 2026-03-09T14:46:35Z
-**Stopped at:** Completed quick task 019: Add tab offset slider
-**Next action:** Milestone complete — all 4 phases done, quick-001 through 019 applied
+**Last session:** 2026-03-12T21:41:45Z
+**Stopped at:** Completed quick task 020: Restyle lock and randomize toggles as pill switches
+**Next action:** Milestone complete — all 4 phases done, quick-001 through 020 applied
 
 ---
-Last activity: 2026-03-09 - Completed quick task 019: Add tab offset slider
-*Last updated: 2026-03-09T14:46:35Z*
+Last activity: 2026-03-12 - Completed quick task 020: Restyle lock and randomize toggles as pill switches
+*Last updated: 2026-03-12T21:41:45Z*
