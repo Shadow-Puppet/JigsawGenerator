@@ -33,14 +33,11 @@ let taperTrack: HTMLElement;
 
 let offsetSlider: HTMLInputElement;
 let offsetReadout: HTMLElement;
-let offsetRandomize: HTMLInputElement;
-let offsetMaxSlider: HTMLInputElement;
-let offsetTrack: HTMLElement;
 
 let pieceTargetInput: HTMLInputElement;
 let pieceSizeWarning: HTMLElement;
-let gridLockBtn: HTMLElement;
-let dimsLockBtn: HTMLElement;
+let gridLockCheckbox: HTMLInputElement;
+let dimsLockCheckbox: HTMLInputElement;
 let gridLocked = false;
 let dimsLocked = false;
 
@@ -91,9 +88,6 @@ function buildConfig(): object {
     tabConfig.taper_max = 0.57 + parseFloat(taperMaxSlider.value) * 0.75;
   }
   tabConfig.offset = parseFloat(offsetSlider.value);
-  if (offsetRandomize.checked) {
-    tabConfig.offset_max = parseFloat(offsetMaxSlider.value);
-  }
   return {
     rows: parseInt(rowsInput.value, 10),
     cols: parseInt(colsInput.value, 10),
@@ -117,7 +111,7 @@ function loadFromURL(): boolean {
   const h = parseFloat(params.get("h") ?? "210");
   const unitParam = params.get("unit") ?? "mm";
   const unit = unitParam === "in" ? "Inches" : "Millimeters";
-  const tab = Math.max(0.15, Math.min(0.25, parseInt(params.get("tab") ?? "25", 10) / 100));
+  const tab = Math.max(0.15, Math.min(0.20, parseInt(params.get("tab") ?? "20", 10) / 100));
   const taperUser = parseInt(params.get("taper") ?? "0", 10) / 100;
   const taper = Math.max(0, Math.min(1, taperUser));
   const seed = params.get("seed") ?? "";
@@ -134,27 +128,23 @@ function loadFromURL(): boolean {
   // Restore randomize state
   if (params.get("tabr") === "1") {
     tabRandomize.checked = true;
-    const tabMax = Math.max(0.15, Math.min(0.25, parseInt(params.get("tabmax") ?? "25", 10) / 100));
+    tabRandomize.closest('.pill-toggle')?.classList.add('active');
+    const tabMax = Math.max(0.15, Math.min(0.20, parseInt(params.get("tabmax") ?? "20", 10) / 100));
     tabMaxSlider.value = String(tabMax);
     tabMaxSlider.style.display = "";
   }
   if (params.get("taperr") === "1") {
     taperRandomize.checked = true;
+    taperRandomize.closest('.pill-toggle')?.classList.add('active');
     const taperMax = Math.max(0, Math.min(1, parseInt(params.get("tapermax") ?? "0", 10) / 100));
     taperMaxSlider.value = String(taperMax);
     taperMaxSlider.style.display = "";
   }
 
-  // Restore offset state
+  // Restore offset state (will be clamped by updateOffsetMax after load)
   const offsetVal = parseInt(params.get("off") ?? "0", 10) / 100;
-  const offset = Math.max(-0.15, Math.min(0.15, offsetVal));
+  const offset = Math.max(0, Math.min(0.20, offsetVal));
   offsetSlider.value = String(offset);
-  if (params.get("offr") === "1") {
-    offsetRandomize.checked = true;
-    const offMax = Math.max(-0.15, Math.min(0.15, parseInt(params.get("offmax") ?? "15", 10) / 100));
-    offsetMaxSlider.value = String(offMax);
-    offsetMaxSlider.style.display = "";
-  }
 
   return true;
 }
@@ -180,10 +170,6 @@ function updateURL(): void {
     params.set("tapermax", String(Math.round(parseFloat(taperMaxSlider.value) * 100)));
   }
   params.set("off", String(Math.round(parseFloat(offsetSlider.value) * 100)));
-  if (offsetRandomize.checked) {
-    params.set("offr", "1");
-    params.set("offmax", String(Math.round(parseFloat(offsetMaxSlider.value) * 100)));
-  }
   history.replaceState(null, "", "?" + params.toString());
 }
 
@@ -208,12 +194,28 @@ function updateTabMax(): void {
   const maxV = cellW / (2.0 * cellH * 1.2);
   const maxApproach = 1.0 / (2.0 * 1.2);
   const safeMax = Math.min(maxH, maxV, maxApproach) * 0.9;
-  const tabMax = Math.min(safeMax, 0.25);
+  const tabMax = Math.min(safeMax, 0.20);
 
   tabSlider.max = String(tabMax);
   tabMaxSlider.max = String(tabMax);
   if (parseFloat(tabSlider.value) > tabMax) tabSlider.value = String(tabMax);
   if (parseFloat(tabMaxSlider.value) > tabMax) tabMaxSlider.value = String(tabMax);
+  updateOffsetMax();
+}
+
+// ─── Dynamic Offset Clamping ─────────────────────────────────
+// Max offset scales inversely with tab size: 0.35 - effective_tab_size.
+// At 25% tab → max 0.10, at 20% → 0.15, at 15% → 0.20.
+
+function updateOffsetMax(): void {
+  const tabSize = tabRandomize.checked
+    ? parseFloat(tabMaxSlider.value)
+    : parseFloat(tabSlider.value);
+  const maxOffset = Math.round((0.35 - tabSize) * 100) / 100;
+  offsetSlider.max = String(maxOffset);
+  if (parseFloat(offsetSlider.value) > maxOffset) {
+    offsetSlider.value = String(maxOffset);
+  }
 }
 
 // ─── Ruler Update ───────────────────────────────────────────
@@ -495,14 +497,9 @@ function updateReadouts(): void {
   } else {
     taperReadout.textContent = parseFloat(taperSlider.value).toFixed(2);
   }
-  if (offsetRandomize.checked) {
-    offsetReadout.textContent = `${parseFloat(offsetSlider.value).toFixed(2)}-${parseFloat(offsetMaxSlider.value).toFixed(2)}`;
-  } else {
-    offsetReadout.textContent = parseFloat(offsetSlider.value).toFixed(2);
-  }
+  offsetReadout.textContent = parseFloat(offsetSlider.value).toFixed(2);
   updateRangeHighlight(tabSlider, tabMaxSlider, tabTrack, tabRandomize.checked);
   updateRangeHighlight(taperSlider, taperMaxSlider, taperTrack, taperRandomize.checked);
-  updateRangeHighlight(offsetSlider, offsetMaxSlider, offsetTrack, offsetRandomize.checked);
 }
 
 // ─── Randomize Toggle Helpers ────────────────────────────────
@@ -512,6 +509,8 @@ function toggleRandomize(
   maxSlider: HTMLInputElement,
   minSlider: HTMLInputElement,
 ): void {
+  const pill = checkbox.closest('.pill-toggle');
+  if (pill) pill.classList.toggle('active', checkbox.checked);
   if (checkbox.checked) {
     maxSlider.style.display = "";
     // Center-aware knob placement
@@ -630,12 +629,14 @@ function syncPieceCount(): void {
   }
 }
 
-function toggleLock(btn: HTMLElement, currentlyLocked: boolean, label: string): boolean {
-  const next = !currentlyLocked;
-  btn.innerHTML = next ? "&#128274;" : "&#128275;";
-  btn.classList.toggle("locked", next);
-  btn.title = next ? `Unlock ${label}` : `Lock ${label}`;
-  return next;
+function toggleLock(checkbox: HTMLInputElement, label: string): boolean {
+  const active = checkbox.checked;
+  const pill = checkbox.closest('.pill-toggle')!;
+  pill.classList.toggle('active', active);
+  const icon = pill.querySelector('.pill-icon')!;
+  icon.innerHTML = active ? '\u{1F512}' : '\u{1F513}';
+  pill.setAttribute('title', active ? `Unlock ${label}` : `Lock ${label}`);
+  return active;
 }
 
 function showWarnings(warnings: string[]): void {
@@ -792,14 +793,11 @@ async function main(): Promise<void> {
 
   offsetSlider = document.getElementById("offset") as HTMLInputElement;
   offsetReadout = document.getElementById("offset-readout")!;
-  offsetRandomize = document.getElementById("offset-randomize") as HTMLInputElement;
-  offsetMaxSlider = document.getElementById("offset-max") as HTMLInputElement;
-  offsetTrack = document.getElementById("offset-track")!;
 
   pieceTargetInput = document.getElementById("piece-target") as HTMLInputElement;
   pieceSizeWarning = document.getElementById("piece-size-warning")!;
-  gridLockBtn = document.getElementById("grid-lock")!;
-  dimsLockBtn = document.getElementById("dims-lock")!;
+  gridLockCheckbox = document.getElementById("grid-lock") as HTMLInputElement;
+  dimsLockCheckbox = document.getElementById("dims-lock") as HTMLInputElement;
 
   rulerWidth = document.getElementById("ruler-width")!;
   rulerHeight = document.getElementById("ruler-height")!;
@@ -835,12 +833,12 @@ async function main(): Promise<void> {
 
   // ─── Event Wiring ───────────────────────────────────────
 
-  // Lock toggle buttons
-  gridLockBtn.addEventListener("click", () => {
-    gridLocked = toggleLock(gridLockBtn, gridLocked, "grid size");
+  // Lock toggle checkboxes
+  gridLockCheckbox.addEventListener("change", () => {
+    gridLocked = toggleLock(gridLockCheckbox, "grid size");
   });
-  dimsLockBtn.addEventListener("click", () => {
-    dimsLocked = toggleLock(dimsLockBtn, dimsLocked, "dimensions");
+  dimsLockCheckbox.addEventListener("change", () => {
+    dimsLocked = toggleLock(dimsLockCheckbox, "dimensions");
   });
 
   // Grid inputs — rows/cols changed by user
@@ -885,8 +883,9 @@ async function main(): Promise<void> {
       if (slider === taperSlider && taperRandomize.checked) {
         clampMinMax(taperSlider, taperMaxSlider);
       }
-      if (slider === offsetSlider && offsetRandomize.checked) {
-        clampMinMax(offsetSlider, offsetMaxSlider);
+      // Tab size affects offset max
+      if (slider === tabSlider) {
+        updateOffsetMax();
       }
       updateReadouts();
       scheduleGenerate();
@@ -896,6 +895,7 @@ async function main(): Promise<void> {
   // Max sliders — clamp and regenerate
   tabMaxSlider.addEventListener("input", () => {
     clampMaxMin(tabSlider, tabMaxSlider);
+    updateOffsetMax();
     updateReadouts();
     scheduleGenerate();
   });
@@ -904,23 +904,14 @@ async function main(): Promise<void> {
     updateReadouts();
     scheduleGenerate();
   });
-  offsetMaxSlider.addEventListener("input", () => {
-    clampMaxMin(offsetSlider, offsetMaxSlider);
-    updateReadouts();
-    scheduleGenerate();
-  });
-
   // Randomize checkboxes
   tabRandomize.addEventListener("change", () => {
     toggleRandomize(tabRandomize, tabMaxSlider, tabSlider);
+    updateOffsetMax();
   });
   taperRandomize.addEventListener("change", () => {
     toggleRandomize(taperRandomize, taperMaxSlider, taperSlider);
   });
-  offsetRandomize.addEventListener("change", () => {
-    toggleRandomize(offsetRandomize, offsetMaxSlider, offsetSlider);
-  });
-
   // Unit select — convert dimensions and recalculate tab max
   unitSelect.addEventListener("change", () => {
     const newUnit = unitSelect.value;

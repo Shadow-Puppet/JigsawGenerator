@@ -13,7 +13,7 @@
           <h1>Puzzle Pattern Generator</h1>
 
           <section class="control-section">
-            <h2 class="section-header">Grid Size <button type="button" class="lock-toggle" id="grid-lock" title="Lock grid size">&#128275;</button></h2>
+            <h2 class="section-header">Grid Size <label class="pill-toggle" title="Lock grid size"><span class="pill-icon">&#x1F513;</span><input type="checkbox" id="grid-lock" /><span class="pill-track"><span class="pill-knob"></span></span></label></h2>
             <div class="control-row piece-count-row">
               <div class="input-group">
                 <label for="piece-target">Piece Count</label>
@@ -34,7 +34,7 @@
           </section>
 
           <section class="control-section">
-            <h2 class="section-header">Dimensions <button type="button" class="lock-toggle" id="dims-lock" title="Lock dimensions">&#128275;</button></h2>
+            <h2 class="section-header">Dimensions <label class="pill-toggle" title="Lock dimensions"><span class="pill-icon">&#x1F513;</span><input type="checkbox" id="dims-lock" /><span class="pill-track"><span class="pill-knob"></span></span></label></h2>
             <div class="control-row">
               <div class="input-group">
                 <label for="width">Width</label>
@@ -58,25 +58,31 @@
             <h2 class="section-header">Parameters</h2>
             <div class="slider-group" id="tab-group">
               <div class="slider-label">
-                <label for="tab">Tab Size</label>
-                <label class="randomize-toggle" title="Randomize per edge">
-                  <input type="checkbox" id="tab-randomize" />
-                  <span class="toggle-icon">&#9860;</span>
-                </label>
-                <span class="readout" id="tab-readout">25%</span>
+                <span class="label-with-toggle">
+                  <label for="tab">Tab Size</label>
+                  <label class="pill-toggle pill-toggle-sm" title="Randomize per edge">
+                    <span class="pill-icon">&#9860;</span>
+                    <input type="checkbox" id="tab-randomize" />
+                    <span class="pill-track"><span class="pill-knob"></span></span>
+                  </label>
+                </span>
+                <span class="readout" id="tab-readout">20%</span>
               </div>
               <div class="range-slider-container" id="tab-track">
-                <input type="range" id="tab" min="0.15" max="0.25" step="0.01" value="0.25" />
-                <input type="range" id="tab-max" min="0.15" max="0.25" step="0.01" value="0.25" class="range-max" style="display:none" />
+                <input type="range" id="tab" min="0.15" max="0.20" step="0.01" value="0.20" />
+                <input type="range" id="tab-max" min="0.15" max="0.20" step="0.01" value="0.20" class="range-max" style="display:none" />
               </div>
             </div>
             <div class="slider-group" id="taper-group">
               <div class="slider-label">
-                <label for="taper">Taper</label>
-                <label class="randomize-toggle" title="Randomize per edge">
-                  <input type="checkbox" id="taper-randomize" />
-                  <span class="toggle-icon">&#9860;</span>
-                </label>
+                <span class="label-with-toggle">
+                  <label for="taper">Taper</label>
+                  <label class="pill-toggle pill-toggle-sm" title="Randomize per edge">
+                    <span class="pill-icon">&#9860;</span>
+                    <input type="checkbox" id="taper-randomize" />
+                    <span class="pill-track"><span class="pill-knob"></span></span>
+                  </label>
+                </span>
                 <span class="readout" id="taper-readout">0.00</span>
               </div>
               <div class="range-slider-container" id="taper-track">
@@ -87,16 +93,9 @@
             <div class="slider-group" id="offset-group">
               <div class="slider-label">
                 <label for="offset">Tab Offset</label>
-                <label class="randomize-toggle" title="Randomize per edge">
-                  <input type="checkbox" id="offset-randomize" />
-                  <span class="toggle-icon">&#9860;</span>
-                </label>
                 <span class="readout" id="offset-readout">0.00</span>
               </div>
-              <div class="range-slider-container" id="offset-track">
-                <input type="range" id="offset" min="-0.15" max="0.15" step="0.01" value="0" />
-                <input type="range" id="offset-max" min="-0.15" max="0.15" step="0.01" value="0.15" class="range-max" style="display:none" />
-              </div>
+              <input type="range" id="offset" min="0" max="0.10" step="0.01" value="0" />
             </div>
           </section>
 

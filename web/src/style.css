@@ -83,30 +83,84 @@ body {
   width: 100%;
 }
 
-/* ─── Lock Toggle ──────────────────────────────────────────── */
+/* ─── Pill Toggle Switch ───────────────────────────────────── */
 
-.lock-toggle {
-  border: none;
-  background: transparent;
+.pill-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   cursor: pointer;
-  font-size: 0.7rem;
-  color: #bbb;
-  padding: 0 0.15rem;
+  user-select: none;
   vertical-align: middle;
+}
+
+.pill-toggle input[type="checkbox"] {
+  display: none;
+}
+
+.pill-icon {
+  font-size: 0.7rem;
+  opacity: 0.4;
+  filter: grayscale(1);
   line-height: 1;
-  transition: color 0.15s;
+  transition: opacity 0.15s;
 }
 
-.lock-toggle:hover {
-  color: #888;
+.pill-toggle.active .pill-icon {
+  opacity: 0.8;
 }
 
-.lock-toggle.locked {
-  color: #4a90d9;
+.pill-track {
+  position: relative;
+  width: 26px;
+  height: 14px;
+  background: #ccc;
+  border-radius: 7px;
+  transition: background 0.2s;
 }
 
-.lock-toggle.locked:hover {
-  color: #3a7bc8;
+.pill-toggle.active .pill-track {
+  background: #4a90d9;
+}
+
+.pill-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 10px;
+  height: 10px;
+  background: #fff;
+  border-radius: 50%;
+  transition: left 0.2s;
+}
+
+.pill-toggle.active .pill-knob {
+  left: 14px;
+}
+
+/* Small variant for randomize toggles */
+.pill-toggle-sm .pill-track {
+  width: 22px;
+  height: 12px;
+  border-radius: 6px;
+}
+
+.pill-toggle-sm .pill-knob {
+  width: 8px;
+  height: 8px;
+  top: 2px;
+  left: 2px;
+}
+
+.pill-toggle-sm.active .pill-knob {
+  left: 12px;
+}
+
+/* Label + toggle grouping */
+.label-with-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 /* ─── Piece Size Warning ──────────────────────────────────── */
@@ -218,29 +272,7 @@ input[type="range"] {
   cursor: pointer;
 }
 
-/* ─── Randomize Toggle ─────────────────────────────────────── */
-
-.randomize-toggle {
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-  font-size: 0.85rem;
-  color: #999;
-  gap: 0.15rem;
-}
-
-.randomize-toggle input[type="checkbox"] {
-  display: none;
-}
-
-.randomize-toggle input[type="checkbox"]:checked + .toggle-icon {
-  color: #4a90d9;
-}
-
-.toggle-icon {
-  font-size: 1rem;
-  transition: color 0.15s;
-}
+/* (Randomize toggle styles replaced by pill-toggle above) */
 
 /* ─── Dual Range Slider ────────────────────────────────────── */
 
