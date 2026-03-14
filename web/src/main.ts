@@ -600,6 +600,10 @@ function calcBestGrid(target: number): void {
     const gridRatio = Math.max(r, c) / Math.min(r, c);
     if (gridRatio > 5) continue;
 
+    // Skip grids where individual pieces exceed 1:3 aspect ratio
+    const pAspect = Math.max((w / c) / (h / r), (h / r) / (w / c));
+    if (pAspect > 3) continue;
+
     const total = r * c;
     const dist = Math.abs(total - target);
     // Piece aspect ratio: (w/c) / (h/r) — want closest to 1
@@ -697,6 +701,40 @@ function enforceConstraints(source: "grid" | "dims"): void {
     if (gridRatio > 5) {
       warnings.push(`Grid ratio ${rows}:${cols} is very extreme. Max recommended ratio is 1:5.`);
     }
+
+    // Piece aspect ratio check — re-read dims in case they were adjusted above
+    {
+      const curWMM = parseFloat(widthInput.value) * factor;
+      const curHMM = parseFloat(heightInput.value) * factor;
+      const curPW = curWMM / cols;
+      const curPH = curHMM / rows;
+      const pieceAspect = Math.max(curPW / curPH, curPH / curPW);
+      if (pieceAspect > 3) {
+        if (dimsLocked) {
+          warnings.push(`Pieces are very elongated (${pieceAspect.toFixed(1)}:1). Unlock dimensions to auto-adjust.`);
+        } else {
+          // Scale the shorter dimension up so aspect ratio = 3:1
+          if (curPW > curPH * 3) {
+            // pieces too wide — increase total height so pieceH = pieceW/3
+            const needH = (curWMM / cols) / 3 * rows;
+            const newHMM = Math.max(curHMM, needH);
+            const newH = newHMM / factor;
+            heightInput.value = unitSelect.value === "Inches"
+              ? parseFloat(newH.toFixed(2)).toString()
+              : String(Math.round(newH));
+          } else {
+            // pieces too tall — increase total width so pieceW = pieceH/3
+            const needW = (curHMM / rows) / 3 * cols;
+            const newWMM = Math.max(curWMM, needW);
+            const newW = newWMM / factor;
+            widthInput.value = unitSelect.value === "Inches"
+              ? parseFloat(newW.toFixed(2)).toString()
+              : String(Math.round(newW));
+          }
+          adjusted = true;
+        }
+      }
+    }
   } else {
     // User changed dimensions — adjust grid (if unlocked)
     const widthMM = w * factor;
@@ -745,6 +783,36 @@ function enforceConstraints(source: "grid" | "dims"): void {
         }
         syncPieceCount();
         adjusted = true;
+      }
+    }
+
+    // Piece aspect ratio check — re-read values in case they were adjusted above
+    {
+      const curW = parseFloat(widthInput.value) * factor;
+      const curH = parseFloat(heightInput.value) * factor;
+      const curPieceW = curW / cols;
+      const curPieceH = curH / rows;
+      const pieceAspect = Math.max(curPieceW / curPieceH, curPieceH / curPieceW);
+      if (pieceAspect > 3) {
+        if (gridLocked) {
+          warnings.push(`Pieces are very elongated (${pieceAspect.toFixed(1)}:1). Unlock grid size to auto-adjust.`);
+        } else {
+          // Adjust rows/cols to bring piece aspect ratio within 3:1
+          const dimRatio = curH / curW;
+          const currentGridRatio = rows / cols;
+          if (currentGridRatio < dimRatio / 3) {
+            // Too few rows — pieces too wide. Increase rows.
+            rows = Math.max(2, Math.ceil(cols * dimRatio / 3));
+            rowsInput.value = String(rows);
+            adjusted = true;
+          } else if (currentGridRatio > dimRatio * 3) {
+            // Too many rows — pieces too tall. Increase cols.
+            cols = Math.max(2, Math.ceil(rows / (dimRatio * 3)));
+            colsInput.value = String(cols);
+            adjusted = true;
+          }
+          if (adjusted) syncPieceCount();
+        }
       }
     }
   }
