@@ -113,6 +113,7 @@ Phase 4 [x] Web GUI & Live Preview (2/2 plans)
 - Pill-shaped toggle switches replace old button/checkbox toggles for lock and randomize controls (quick-020)
 - Inline SVG icons (outlined padlock, die face) instead of emoji — matches Web Awesome aesthetic, zero dependencies (quick-020)
 - Max tab size reduced from 25% to 20% — prevents oversized connectors (quick-020, supersedes quick-003)
+- Piece aspect ratio enforcement: 3:1 max in enforceConstraints() and calcBestGrid(); auto-adjusts unlocked counterpart or warns when locked (quick-021)
 
 ### Research Flags
 - **Phase 3 (Connectors):** Complete. Connector generation + SVG export pipeline fully functional.
@@ -157,13 +158,14 @@ Phase 4 [x] Web GUI & Live Preview (2/2 plans)
 | 018 | Center-aware range slider toggle behavior | 2026-03-09 | 4e1065f | [18-change-range-slider-behavior-based-on-si](./quick/18-change-range-slider-behavior-based-on-si/) |
 | 019 | Add tab offset slider that shifts knob position along edge | 2026-03-09 | a1be0a9 | [19-add-tab-offset-slider-that-moves-the-tab](./quick/19-add-tab-offset-slider-that-moves-the-tab/) |
 | 020 | Restyle lock and randomize toggles as pill switches with SVG icons, cap tab max at 20% | 2026-03-12 | 1944631 | [20-restyle-lock-and-random-range-toggles-as](./quick/20-restyle-lock-and-random-range-toggles-as/) |
+| 021 | Add piece aspect ratio enforcement (3:1 max) to prevent elongated pieces | 2026-03-14 | 3f49365 | [21-adjust-grid-size-and-dimension-linking-l](./quick/21-adjust-grid-size-and-dimension-linking-l/) |
 
 ## Session Continuity
 
-**Last session:** 2026-03-12T21:41:45Z
-**Stopped at:** Completed quick task 020: Restyle lock and randomize toggles as pill switches
-**Next action:** Milestone complete — all 4 phases done, quick-001 through 020 applied
+**Last session:** 2026-03-14T14:14:14Z
+**Stopped at:** Completed quick task 021: Add piece aspect ratio enforcement
+**Next action:** Milestone complete — all 4 phases done, quick-001 through 021 applied
 
 ---
-Last activity: 2026-03-12 - Completed quick task 020: Restyle lock and randomize toggles as pill switches
-*Last updated: 2026-03-12T21:41:45Z*
+Last activity: 2026-03-14 - Completed quick task 021: Add piece aspect ratio enforcement
+*Last updated: 2026-03-14T14:14:14Z*
