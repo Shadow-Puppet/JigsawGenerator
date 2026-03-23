@@ -1,4 +1,5 @@
 pub mod binary_export;
+pub mod boundary;
 pub mod classic_connector;
 pub mod config;
 pub mod connector;
@@ -11,6 +12,7 @@ pub mod shapes;
 pub mod svg_export;
 
 pub use binary_export::*;
+pub use boundary::*;
 pub use classic_connector::*;
 pub use config::*;
 pub use connector::*;

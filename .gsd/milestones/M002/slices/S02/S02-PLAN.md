@@ -42,7 +42,7 @@
 
 ## Tasks
 
-- [ ] **T01: Implement BoundaryPuzzle core engine with cell classification and edge filtering** `est:1h`
+- [x] **T01: Implement BoundaryPuzzle core engine with cell classification and edge filtering** `est:1h`
   - Why: Core geometric engine for R002/R004/R013 — classifies cells as inside/outside a boundary shape, filters edges, provides the `included_cells` and `included_edges` API that SVG export and WASM integration consume
   - Files: `crates/puzzle-core/src/boundary.rs`, `crates/puzzle-core/src/lib.rs`
   - Do: Create `BoundaryPuzzle` struct wrapping `PuzzleGrid` + boundary `BezPath`. Use kurbo `Shape::winding()` to test cell center containment (nonzero = inside). Classify edges: between two inside cells → included (keep connector); between inside and outside → boundary-adjacent (excluded from internal edges, replaced by shape contour); between two outside cells → excluded. Support both mask mode (keep inside boundary) and difference mode (remove inside whimsy shape). Generate full rectangular grid first for RNG determinism, then filter. Include comprehensive unit tests: cell classification for heart/star shapes, edge filtering correctness, determinism, whimsy hole cutting, empty-boundary edge case.
