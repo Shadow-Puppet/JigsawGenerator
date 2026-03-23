@@ -168,6 +168,7 @@ mod tests {
             unit: Unit::Millimeters,
             tab: TabConfig::default(),
             seed: seed.to_string(),
+            border_shape: None,
         }
     }
 

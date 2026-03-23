@@ -57,3 +57,10 @@ Connect the Rust `BoundaryPuzzle` engine to the browser by extending the WASM en
 
 - `crates/puzzle-core/src/config.rs` — updated with optional border_shape field
 - `crates/puzzle-wasm/src/lib.rs` — updated WASM endpoints with border shape support and ≥5 new tests
+
+## Observability Impact
+
+- **New diagnostic surface:** `resolve_border_shape()` helper centralizes shape name validation — unknown names produce structured error JSON `{"error":"Unknown border shape: <name>"}` visible in both `generate_svg()` and `generate_grid()` responses.
+- **Inspection:** WASM tests verify boundary-aware SVG generation, piece filtering, and error handling for invalid shapes. `generate_edges_binary()` with `border_shape` caches the boundary SVG (retrievable via `get_cached_svg()`).
+- **Failure visibility:** Invalid `border_shape` values return error JSON from all three endpoints (`generate_svg`, `generate_grid`, `generate_edges_binary`) rather than panicking.
+- **No runtime signals:** Pure computation, no async/IO.

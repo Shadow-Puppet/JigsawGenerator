@@ -57,7 +57,7 @@
   - Verify: `cargo test --manifest-path crates/puzzle-core/Cargo.toml -- boundary` passes all boundary export tests
   - Done when: Heart-shaped puzzle SVG contains cubic bezier border curves (not rectangular), only interior edges appear, binary export counts match included edge count
 
-- [ ] **T03: Wire boundary puzzle through WASM endpoints** `est:45m`
+- [x] **T03: Wire boundary puzzle through WASM endpoints** `est:45m`
   - Why: Connects Rust boundary engine to the browser — S03 needs WASM endpoints that accept a border shape parameter; proves the full pipeline compiles to WASM
   - Files: `crates/puzzle-core/src/config.rs`, `crates/puzzle-wasm/src/lib.rs`
   - Do: Add optional `border_shape: Option<String>` field to `PuzzleConfig` (serde default None for backward compat). In puzzle-wasm, when `border_shape` is Some("heart"|"star"), create the corresponding BezPath scaled to puzzle dimensions, construct `BoundaryPuzzle`, and use boundary-aware export. Existing endpoints continue to work unchanged when `border_shape` is None. Add WASM-level tests: generate with border_shape="heart" returns SVG with curved border, binary export has correct shape contour, backward compat (no border_shape) unchanged. Verify WASM compilation.

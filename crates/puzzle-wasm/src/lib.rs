@@ -4,12 +4,28 @@ use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
 use puzzle_core::{
-    border_to_binary, compute_piece_breakdown, edges_to_binary, ClassicKnobConnector, GridConfig,
-    PieceType, PuzzleConfig, PuzzleGrid,
+    border_to_binary, compute_piece_breakdown, edges_to_binary, heart_path, star_path,
+    BoundaryPuzzle, ClassicKnobConnector, GridConfig, PieceType, PuzzleConfig, PuzzleGrid,
 };
 
 thread_local! {
     static CACHED_SVG: RefCell<String> = RefCell::new(String::new());
+}
+
+/// Resolve a border shape name to a BezPath at the given dimensions.
+///
+/// Returns `Ok(BezPath)` for known shapes ("heart", "star"), or
+/// `Err(error_message)` for unknown shape names.
+fn resolve_border_shape(
+    name: &str,
+    width: f64,
+    height: f64,
+) -> Result<kurbo::BezPath, String> {
+    match name {
+        "heart" => Ok(heart_path(width, height)),
+        "star" => Ok(star_path(width, height, 5)),
+        other => Err(format!("Unknown border shape: {}", other)),
+    }
 }
 
 /// Initialize the panic hook for better error messages in the browser console.
@@ -135,34 +151,73 @@ pub fn generate_grid(config_json: &str) -> String {
     let cols = grid.config.cols;
     let rows_usize = rows as usize;
     let cols_usize = cols as usize;
+    let border_shape = grid.config.border_shape.clone();
+    let grid_width = grid.config.width;
+    let grid_height = grid.config.height;
+
+    // Unify grid access: when boundary puzzle is active, grid lives inside it
+    enum GridAccess {
+        Owned(PuzzleGrid),
+        InBoundary(BoundaryPuzzle),
+    }
+
+    let access = if let Some(ref shape_name) = border_shape {
+        let boundary = match resolve_border_shape(shape_name, grid_width, grid_height) {
+            Ok(b) => b,
+            Err(e) => return format!(r#"{{"error":"{}"}}"#, e),
+        };
+        GridAccess::InBoundary(BoundaryPuzzle::new(grid, boundary))
+    } else {
+        GridAccess::Owned(grid)
+    };
+
+    let (grid_ref, bp_opt): (&PuzzleGrid, Option<&BoundaryPuzzle>) = match &access {
+        GridAccess::Owned(g) => (g, None),
+        GridAccess::InBoundary(bp) => (&bp.grid, Some(bp)),
+    };
 
     // Piece breakdown
-    let all_pieces = grid.pieces();
-    let corners = all_pieces
+    let all_pieces = grid_ref.pieces();
+
+    // Filter pieces to only included cells when boundary is active
+    let filtered_pieces: Vec<_> = if let Some(bp) = bp_opt {
+        all_pieces
+            .iter()
+            .filter(|p| bp.cell_inside[p.row][p.col])
+            .collect()
+    } else {
+        all_pieces.iter().collect()
+    };
+
+    let corners = filtered_pieces
         .iter()
         .filter(|p| p.piece_type == PieceType::Corner)
         .count();
-    let edges = all_pieces
+    let edges = filtered_pieces
         .iter()
         .filter(|p| p.piece_type == PieceType::Edge)
         .count();
-    let interior = all_pieces
+    let interior = filtered_pieces
         .iter()
         .filter(|p| p.piece_type == PieceType::Interior)
         .count();
 
     // Edge summary
-    let border_count = grid
+    let border_count = grid_ref
         .h_edges
         .iter()
-        .chain(grid.v_edges.iter())
+        .chain(grid_ref.v_edges.iter())
         .filter(|e| e.is_border)
         .count();
-    let total_edges = grid.h_edges.len() + grid.v_edges.len();
-    let internal_count = total_edges - border_count;
+    let total_edges = grid_ref.h_edges.len() + grid_ref.v_edges.len();
+    let internal_count = if let Some(bp) = bp_opt {
+        bp.included_edge_count()
+    } else {
+        total_edges - border_count
+    };
 
-    // Per-piece info
-    let pieces: Vec<PieceInfo> = all_pieces
+    // Per-piece info (only included pieces when boundary is active)
+    let pieces: Vec<PieceInfo> = filtered_pieces
         .iter()
         .map(|p| {
             let piece_type_str = match p.piece_type {
@@ -185,18 +240,18 @@ pub fn generate_grid(config_json: &str) -> String {
     let response = GridResponse {
         rows,
         cols,
-        width_mm: grid.config.width,
-        height_mm: grid.config.height,
+        width_mm: grid_ref.config.width,
+        height_mm: grid_ref.config.height,
         seed: seed_used,
         piece_breakdown: PieceBreakdownInfo {
-            total: all_pieces.len(),
+            total: filtered_pieces.len(),
             corners,
             edges,
             interior,
         },
         edge_summary: EdgeSummary {
-            h_edge_count: grid.h_edges.len(),
-            v_edge_count: grid.v_edges.len(),
+            h_edge_count: grid_ref.h_edges.len(),
+            v_edge_count: grid_ref.v_edges.len(),
             border_count,
             internal_count,
         },
@@ -231,6 +286,8 @@ pub fn generate_svg(config_json: &str) -> String {
         config.seed = "default".to_string();
     }
 
+    let border_shape = config.border_shape.clone();
+
     // 2. Create PuzzleGrid (validates config internally)
     let mut grid = match PuzzleGrid::new(config) {
         Ok(g) => g,
@@ -241,7 +298,16 @@ pub fn generate_svg(config_json: &str) -> String {
     grid.generate_connectors(&ClassicKnobConnector);
 
     // 4. Generate and return SVG
-    puzzle_core::generate_svg(&grid)
+    if let Some(ref shape_name) = border_shape {
+        let boundary = match resolve_border_shape(shape_name, grid.config.width, grid.config.height) {
+            Ok(b) => b,
+            Err(e) => return format!(r#"{{"error":"{}"}}"#, e),
+        };
+        let bp = BoundaryPuzzle::new(grid, boundary);
+        bp.generate_boundary_svg()
+    } else {
+        puzzle_core::generate_svg(&grid)
+    }
 }
 
 /// Generate binary edge data for Canvas 2D rendering.
@@ -276,6 +342,8 @@ pub fn generate_edges_binary(config_json: &str) -> JsValue {
         config.seed = "default".to_string();
     }
 
+    let border_shape = config.border_shape.clone();
+
     // 2. Create PuzzleGrid
     let mut grid = match PuzzleGrid::new(config) {
         Ok(g) => g,
@@ -292,15 +360,36 @@ pub fn generate_edges_binary(config_json: &str) -> JsValue {
     // 3. Generate connectors
     grid.generate_connectors(&ClassicKnobConnector);
 
-    // 4. Cache SVG (generated from same grid, no need to regenerate later)
-    let svg = puzzle_core::generate_svg(&grid);
+    // 4-5. Generate SVG + binary data (boundary-aware when shape is set)
+    let (svg, edges_data, border_data) = if let Some(ref shape_name) = border_shape {
+        let boundary = match resolve_border_shape(shape_name, width, height) {
+            Ok(b) => b,
+            Err(e) => {
+                let obj = js_sys::Object::new();
+                let _ = js_sys::Reflect::set(
+                    &obj,
+                    &JsValue::from_str("error"),
+                    &JsValue::from_str(&e),
+                );
+                return obj.into();
+            }
+        };
+        let bp = BoundaryPuzzle::new(grid, boundary);
+        let svg = bp.generate_boundary_svg();
+        let edges = bp.boundary_edges_to_binary();
+        let border = bp.boundary_border_to_binary();
+        (svg, edges, border)
+    } else {
+        let svg = puzzle_core::generate_svg(&grid);
+        let edges = edges_to_binary(&grid);
+        let border = border_to_binary(&grid);
+        (svg, edges, border)
+    };
+
+    // Cache SVG for retrieval via get_cached_svg()
     CACHED_SVG.with(|c| {
         *c.borrow_mut() = svg;
     });
-
-    // 5. Generate binary data
-    let edges_data = edges_to_binary(&grid);
-    let border_data = border_to_binary(&grid);
 
     // 6. Create Float64Arrays
     let edges_arr = js_sys::Float64Array::new_with_length(edges_data.len() as u32);
@@ -548,6 +637,170 @@ mod tests {
         assert!(
             result.contains(r#""error""#),
             "should return error JSON for invalid input"
+        );
+    }
+
+    // ─── Border Shape Tests ──────────────────────────────────────
+
+    #[test]
+    fn test_generate_svg_with_heart_border() {
+        // Heart border SVG should contain cubic bezier curves from the heart shape,
+        // not the rectangular border lines.
+        let config_json = r#"{"rows":6,"cols":8,"width":200.0,"height":150.0,"unit":"Millimeters","tab":{"size_pct":0.25},"seed":"heart-svg","border_shape":"heart"}"#;
+        let result = generate_svg(config_json);
+
+        assert!(
+            result.starts_with("<svg"),
+            "should return SVG, got: {}...",
+            &result[..80.min(result.len())]
+        );
+        assert!(!result.contains(r#""error""#), "should not be error JSON");
+
+        // Heart border produces cubic bezier curves
+        let d_start = result.find("d='").expect("should have d attribute") + 3;
+        let d_end = result[d_start..].find('\'').unwrap() + d_start;
+        let path_data = &result[d_start..d_end];
+
+        assert!(
+            path_data.contains('C'),
+            "heart border SVG should contain C (cubic bezier) commands"
+        );
+    }
+
+    #[test]
+    fn test_generate_svg_with_star_border() {
+        // Star border SVG should work and produce valid SVG with line-based border.
+        let config_json = r#"{"rows":6,"cols":8,"width":200.0,"height":150.0,"unit":"Millimeters","tab":{"size_pct":0.25},"seed":"star-svg","border_shape":"star"}"#;
+        let result = generate_svg(config_json);
+
+        assert!(
+            result.starts_with("<svg"),
+            "should return SVG, got: {}...",
+            &result[..80.min(result.len())]
+        );
+        assert!(!result.contains(r#""error""#), "should not be error JSON");
+
+        // Star border produces line segments (L commands) in addition to M commands
+        let d_start = result.find("d='").expect("should have d attribute") + 3;
+        let d_end = result[d_start..].find('\'').unwrap() + d_start;
+        let path_data = &result[d_start..d_end];
+
+        assert!(
+            path_data.contains('L'),
+            "star border SVG should contain L (lineTo) commands from star polygon"
+        );
+    }
+
+    #[test]
+    fn test_generate_svg_no_border_shape_unchanged() {
+        // Without border_shape, generate_svg should produce the same SVG as before.
+        let config_with_none = r#"{"rows":3,"cols":4,"width":200.0,"height":150.0,"unit":"Millimeters","tab":{"size_pct":0.25},"seed":"compat-svg"}"#;
+        let config_with_null = r#"{"rows":3,"cols":4,"width":200.0,"height":150.0,"unit":"Millimeters","tab":{"size_pct":0.25},"seed":"compat-svg","border_shape":null}"#;
+
+        let svg_none = generate_svg(config_with_none);
+        let svg_null = generate_svg(config_with_null);
+
+        assert!(svg_none.starts_with("<svg"), "should be SVG");
+        assert_eq!(
+            svg_none, svg_null,
+            "absent and null border_shape should produce identical SVG"
+        );
+    }
+
+    #[test]
+    fn test_generate_grid_with_border_shape_fewer_pieces() {
+        // Heart border should include fewer pieces than the full rectangular grid.
+        let config_no_border = r#"{"rows":6,"cols":8,"width":200.0,"height":150.0,"unit":"Millimeters","tab":{"size_pct":0.25},"seed":"pieces-cmp"}"#;
+        let config_heart = r#"{"rows":6,"cols":8,"width":200.0,"height":150.0,"unit":"Millimeters","tab":{"size_pct":0.25},"seed":"pieces-cmp","border_shape":"heart"}"#;
+
+        let result_full = generate_grid(config_no_border);
+        let result_heart = generate_grid(config_heart);
+
+        assert!(!result_full.contains(r#""error""#), "full grid error: {}", result_full);
+        assert!(!result_heart.contains(r#""error""#), "heart grid error: {}", result_heart);
+
+        let parsed_full: serde_json::Value = serde_json::from_str(&result_full).unwrap();
+        let parsed_heart: serde_json::Value = serde_json::from_str(&result_heart).unwrap();
+
+        let full_total = parsed_full["piece_breakdown"]["total"].as_u64().unwrap();
+        let heart_total = parsed_heart["piece_breakdown"]["total"].as_u64().unwrap();
+
+        assert!(
+            heart_total < full_total,
+            "heart border should have fewer pieces ({}) than full grid ({})",
+            heart_total,
+            full_total
+        );
+        assert!(
+            heart_total > 0,
+            "heart border should still have some pieces"
+        );
+
+        // Also check that pieces array length matches total
+        let heart_pieces = parsed_heart["pieces"].as_array().unwrap();
+        assert_eq!(
+            heart_pieces.len() as u64, heart_total,
+            "pieces array length should match total"
+        );
+    }
+
+    #[test]
+    fn test_border_shape_invalid_returns_error() {
+        // Unknown shape name should return an error.
+        let config_json = r#"{"rows":6,"cols":8,"width":200.0,"height":150.0,"unit":"Millimeters","tab":{"size_pct":0.25},"seed":"bad-shape","border_shape":"hexagon"}"#;
+
+        let svg_result = generate_svg(config_json);
+        assert!(
+            svg_result.contains(r#""error""#),
+            "unknown border_shape should return error in generate_svg, got: {}",
+            svg_result
+        );
+        assert!(
+            svg_result.contains("Unknown border shape"),
+            "error should mention unknown shape"
+        );
+
+        let grid_result = generate_grid(config_json);
+        assert!(
+            grid_result.contains(r#""error""#),
+            "unknown border_shape should return error in generate_grid"
+        );
+    }
+
+    #[test]
+    fn test_border_shape_resolution_heart() {
+        // Verify resolve_border_shape produces a valid BezPath for "heart".
+        let boundary = resolve_border_shape("heart", 200.0, 150.0);
+        assert!(boundary.is_ok(), "heart should resolve to a valid BezPath");
+    }
+
+    #[test]
+    fn test_border_shape_resolution_star() {
+        // Verify resolve_border_shape produces a valid BezPath for "star".
+        let boundary = resolve_border_shape("star", 200.0, 150.0);
+        assert!(boundary.is_ok(), "star should resolve to a valid BezPath");
+    }
+
+    #[test]
+    fn test_border_shape_resolution_unknown() {
+        // Verify resolve_border_shape returns error for unknown shapes.
+        let boundary = resolve_border_shape("hexagon", 200.0, 150.0);
+        assert!(boundary.is_err(), "hexagon should return error");
+        assert!(
+            boundary.unwrap_err().contains("Unknown border shape"),
+            "error should mention unknown shape"
+        );
+    }
+
+    #[test]
+    fn test_generate_svg_heart_border_deterministic() {
+        // Same config with heart border should produce identical SVG.
+        let config_json = r#"{"rows":6,"cols":8,"width":200.0,"height":150.0,"unit":"Millimeters","tab":{"size_pct":0.25},"seed":"determ-heart","border_shape":"heart"}"#;
+        let svg1 = generate_svg(config_json);
+        let svg2 = generate_svg(config_json);
+        assert_eq!(
+            svg1, svg2,
+            "same seed + heart border must produce identical SVG"
         );
     }
 }
