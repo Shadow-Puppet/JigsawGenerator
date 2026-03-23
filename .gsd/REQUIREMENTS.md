@@ -4,18 +4,7 @@ This file is the explicit capability and coverage contract for the project.
 
 ## Active
 
-### R001 — Shape library with preset SVG shapes
-- Class: core-capability
-- Status: active
-- Description: Heart and star shapes defined as kurbo BezPaths in the Rust core, available for both border and whimsy use
-- Why it matters: Foundation for all non-rectangular geometry — both custom borders and whimsy pieces consume shapes from this library
-- Source: user
-- Primary owning slice: M002/S01
-- Supporting slices: M002/S02, M002/S03, M002/S04
-- Validation: unmapped
-- Notes: Start with heart + star; library is extensible for future shapes
-
-### R002 — Mask operation — generate puzzle grid inside arbitrary boundary
+### R002 — Given a closed BezPath boundary, generate a puzzle grid where edges are clipped to the boundary and pieces outside are removed. Grid adapts piece count to fill the shape naturally.
 - Class: core-capability
 - Status: active
 - Description: Given a closed BezPath boundary, generate a puzzle grid where edges are clipped to the boundary and pieces outside are removed. Grid adapts piece count to fill the shape naturally.
@@ -26,7 +15,7 @@ This file is the explicit capability and coverage contract for the project.
 - Validation: unmapped
 - Notes: Uses linesweeper for boolean path ops on kurbo BezPaths
 
-### R003 — Custom border — user selects non-rectangular puzzle outline
+### R003 — User picks a shape from the library as the puzzle's outer boundary. The grid generates inside that shape with adapted piece count.
 - Class: primary-user-loop
 - Status: active
 - Description: User picks a shape from the library as the puzzle's outer boundary. The grid generates inside that shape with adapted piece count.
@@ -37,7 +26,7 @@ This file is the explicit capability and coverage contract for the project.
 - Validation: unmapped
 - Notes: Shape selection via UI dropdown; preview updates live
 
-### R004 — Reverse-mask operation — remove grid edges inside a shape
+### R004 — Given a placed whimsy shape, remove all grid edges that fall inside it. Grid edges terminate at the whimsy boundary. The whimsy boundary itself is the cut line — no tab connectors at the boundary.
 - Class: core-capability
 - Status: active
 - Description: Given a placed whimsy shape, remove all grid edges that fall inside it. Grid edges terminate at the whimsy boundary. The whimsy boundary itself is the cut line — no tab connectors at the boundary.
@@ -48,7 +37,7 @@ This file is the explicit capability and coverage contract for the project.
 - Validation: unmapped
 - Notes: Same boolean op engine as mask, just keeping the opposite side
 
-### R005 — Whimsy placement — drag-and-drop shape onto grid
+### R005 — User drags a shape from the library onto the puzzle grid preview, positioning it freely anywhere (no grid snap)
 - Class: primary-user-loop
 - Status: active
 - Description: User drags a shape from the library onto the puzzle grid preview, positioning it freely anywhere (no grid snap)
@@ -59,7 +48,7 @@ This file is the explicit capability and coverage contract for the project.
 - Validation: unmapped
 - Notes: Free-form positioning; one whimsy at a time for v1
 
-### R006 — Whimsy resize — user can scale placed whimsy shape
+### R006 — After placing a whimsy shape, user can resize it by dragging handles or using a control. Grid adapts in real-time.
 - Class: primary-user-loop
 - Status: active
 - Description: After placing a whimsy shape, user can resize it by dragging handles or using a control. Grid adapts in real-time.
@@ -70,7 +59,7 @@ This file is the explicit capability and coverage contract for the project.
 - Validation: unmapped
 - Notes: Scale uniformly to preserve shape proportions
 
-### R007 — Grid adaptation — grid edges terminate at whimsy boundary
+### R007 — When a whimsy shape is placed, grid edges inside the shape are removed. Edges crossing the boundary are trimmed. The whimsy outline becomes a smooth cut line with no tab connectors.
 - Class: core-capability
 - Status: active
 - Description: When a whimsy shape is placed, grid edges inside the shape are removed. Edges crossing the boundary are trimmed. The whimsy outline becomes a smooth cut line with no tab connectors.
@@ -81,7 +70,7 @@ This file is the explicit capability and coverage contract for the project.
 - Validation: unmapped
 - Notes: Whimsy boundary = cut line, no tabs. Connectors only on grid-to-grid edges.
 
-### R008 — Sub-puzzle splitting — user picks piece count for whimsy interior
+### R008 — User sets how many sub-pieces the whimsy splits into (2, 3, 4...). The whimsy interior is subdivided using the same connector generation as the parent puzzle.
 - Class: core-capability
 - Status: active
 - Description: User sets how many sub-pieces the whimsy splits into (2, 3, 4...). The whimsy interior is subdivided using the same connector generation as the parent puzzle.
@@ -92,7 +81,7 @@ This file is the explicit capability and coverage contract for the project.
 - Validation: unmapped
 - Notes: Reuses mask operation + connector generation inside whimsy boundary
 
-### R009 — SVG export includes all new geometry
+### R009 — Downloaded SVG contains custom border contour, whimsy cut lines, sub-puzzle internal cuts, and all modified grid edges — complete and valid for laser cutting
 - Class: launchability
 - Status: active
 - Description: Downloaded SVG contains custom border contour, whimsy cut lines, sub-puzzle internal cuts, and all modified grid edges — complete and valid for laser cutting
@@ -103,7 +92,7 @@ This file is the explicit capability and coverage contract for the project.
 - Validation: unmapped
 - Notes: Must work with existing laser cutter software (Lightburn, Glowforge UI)
 
-### R010 — Geometric correctness — all paths valid for laser cutting
+### R010 — No overlapping paths, no gaps, no self-intersecting cuts. Every generated piece is physically cuttable. Connectors mate correctly.
 - Class: quality-attribute
 - Status: active
 - Description: No overlapping paths, no gaps, no self-intersecting cuts. Every generated piece is physically cuttable. Connectors mate correctly.
@@ -114,7 +103,7 @@ This file is the explicit capability and coverage contract for the project.
 - Validation: unmapped
 - Notes: Both geometric correctness AND interaction quality are equally important to the user
 
-### R011 — Responsive interaction — preview updates in real-time
+### R011 — During whimsy drag/resize and border selection, the Canvas preview updates responsively without perceptible lag
 - Class: quality-attribute
 - Status: active
 - Description: During whimsy drag/resize and border selection, the Canvas preview updates responsively without perceptible lag
@@ -125,7 +114,7 @@ This file is the explicit capability and coverage contract for the project.
 - Validation: unmapped
 - Notes: WASM generation must be fast enough for interactive use; may need incremental updates
 
-### R012 — One whimsy per puzzle (v1 constraint)
+### R012 — Only one whimsy shape can be placed on a puzzle at a time
 - Class: constraint
 - Status: active
 - Description: Only one whimsy shape can be placed on a puzzle at a time
@@ -136,7 +125,7 @@ This file is the explicit capability and coverage contract for the project.
 - Validation: unmapped
 - Notes: Multiple whimsy deferred to R014
 
-### R013 — Seed determinism preserved across new features
+### R013 — Same seed + same whimsy config + same border = identical output. Determinism extends to all new geometry.
 - Class: quality-attribute
 - Status: active
 - Description: Same seed + same whimsy config + same border = identical output. Determinism extends to all new geometry.
@@ -149,121 +138,20 @@ This file is the explicit capability and coverage contract for the project.
 
 ## Validated
 
-### GRID-01 — User can configure puzzle grid as rows x columns
+### R001 — Heart and star shapes defined as kurbo BezPaths in the Rust core, available for both border and whimsy use
 - Class: core-capability
 - Status: validated
-- Source: inferred
-- Primary owning slice: M001
-- Validation: validated
-
-### GRID-02 — User can set puzzle physical size in millimeters or inches
-- Class: core-capability
-- Status: validated
-- Source: inferred
-- Primary owning slice: M001
-- Validation: validated
-
-### GRID-03 — User can control tab/knob size as percentage of edge length
-- Class: core-capability
-- Status: validated
-- Source: inferred
-- Primary owning slice: M001
-- Validation: validated
-
-### GRID-04 — User can control jitter/randomness amount per edge
-- Class: core-capability
-- Status: validated
-- Source: inferred
-- Primary owning slice: M001
-- Validation: validated
-
-### GRID-05 — User can set rounded corner radius on puzzle border
-- Class: core-capability
-- Status: validated
-- Source: inferred
-- Primary owning slice: M001
-- Validation: validated
-
-### GRID-06 — User can see piece count breakdown (total, edge, corner, interior)
-- Class: core-capability
-- Status: validated
-- Source: inferred
-- Primary owning slice: M001
-- Validation: validated
-
-### CONN-01 — Puzzle generates classic knob connector shapes
-- Class: core-capability
-- Status: validated
-- Source: inferred
-- Primary owning slice: M001
-- Validation: validated
-
-### CONN-02 — Each edge is procedurally varied
-- Class: core-capability
-- Status: validated
-- Source: inferred
-- Primary owning slice: M001
-- Validation: validated
-
-### CONN-03 — User can set a seed value to reproduce exact puzzle configurations
-- Class: core-capability
-- Status: validated
-- Source: inferred
-- Primary owning slice: M001
-- Validation: validated
-
-### EXPT-01 — User can export puzzle as SVG
-- Class: core-capability
-- Status: validated
-- Source: inferred
-- Primary owning slice: M001
-- Validation: validated
-
-### EXPT-02 — User can apply kerf compensation
-- Class: core-capability
-- Status: validated
-- Source: inferred
-- Primary owning slice: M001
-- Validation: validated
-
-### GUI-01 — User can configure all parameters via web-based controls
-- Class: core-capability
-- Status: validated
-- Source: inferred
-- Primary owning slice: M001
-- Validation: validated
-
-### GUI-02 — User sees live SVG preview that updates as parameters change
-- Class: core-capability
-- Status: validated
-- Source: inferred
-- Primary owning slice: M001
-- Validation: validated
-
-### GUI-03 — User can share puzzle configuration via URL
-- Class: core-capability
-- Status: validated
-- Source: inferred
-- Primary owning slice: M001
-- Validation: validated
-
-### INFR-01 — Puzzle generation runs in Rust compiled to WASM
-- Class: core-capability
-- Status: validated
-- Source: inferred
-- Primary owning slice: M001
-- Validation: validated
-
-### INFR-02 — Connector generation uses pluggable trait/interface
-- Class: core-capability
-- Status: validated
-- Source: inferred
-- Primary owning slice: M001
-- Validation: validated
+- Description: Heart and star shapes defined as kurbo BezPaths in the Rust core, available for both border and whimsy use
+- Why it matters: Foundation for all non-rectangular geometry — both custom borders and whimsy pieces consume shapes from this library
+- Source: user
+- Primary owning slice: M002/S01
+- Supporting slices: M002/S02, M002/S03, M002/S04
+- Validation: S01 delivered heart_path and star_path as kurbo BezPaths in puzzle-core/shapes.rs, plus mask_intersection and mask_difference wrappers in masking.rs. 114 tests pass (5 shape + 4 masking + 105 existing). WASM compilation of full dependency tree confirmed via cargo check --target wasm32-unknown-unknown on puzzle-wasm.
+- Notes: Start with heart + star; library is extensible for future shapes
 
 ## Deferred
 
-### R014 — Multiple whimsy pieces per puzzle
+### R014 — Place multiple whimsy shapes on the same puzzle, including whimsy-whimsy intersection handling
 - Class: core-capability
 - Status: deferred
 - Description: Place multiple whimsy shapes on the same puzzle, including whimsy-whimsy intersection handling
@@ -274,7 +162,7 @@ This file is the explicit capability and coverage contract for the project.
 - Validation: unmapped
 - Notes: Deferred to avoid whimsy-whimsy intersection complexity in v1
 
-### R015 — User-imported SVG outlines for whimsy shapes
+### R015 — User uploads their own SVG file to use as a whimsy or border shape
 - Class: core-capability
 - Status: deferred
 - Description: User uploads their own SVG file to use as a whimsy or border shape
@@ -285,7 +173,7 @@ This file is the explicit capability and coverage contract for the project.
 - Validation: unmapped
 - Notes: Requires SVG parsing, path simplification, and validation
 
-### R016 — Multi-piece whimsy spanning multiple grid cells
+### R016 — A single whimsy shape that spans multiple grid pieces, with each piece containing part of the whimsy outline
 - Class: core-capability
 - Status: deferred
 - Description: A single whimsy shape that spans multiple grid pieces, with each piece containing part of the whimsy outline
@@ -298,7 +186,7 @@ This file is the explicit capability and coverage contract for the project.
 
 ## Out of Scope
 
-### R017 — Whimsy snap-to-grid
+### R017 — Snapping whimsy placement to grid cell boundaries
 - Class: anti-feature
 - Status: out-of-scope
 - Description: Snapping whimsy placement to grid cell boundaries
@@ -313,8 +201,8 @@ This file is the explicit capability and coverage contract for the project.
 
 | ID | Class | Status | Primary owner | Supporting | Proof |
 |---|---|---|---|---|---|
-| R001 | core-capability | active | M002/S01 | M002/S02,S03,S04 | unmapped |
-| R002 | core-capability | active | M002/S02 | M002/S03,S05 | unmapped |
+| R001 | core-capability | validated | M002/S01 | M002/S02, M002/S03, M002/S04 | S01 delivered heart_path and star_path as kurbo BezPaths in puzzle-core/shapes.rs, plus mask_intersection and mask_difference wrappers in masking.rs. 114 tests pass (5 shape + 4 masking + 105 existing). WASM compilation of full dependency tree confirmed via cargo check --target wasm32-unknown-unknown on puzzle-wasm. |
+| R002 | core-capability | active | M002/S02 | M002/S03, M002/S05 | unmapped |
 | R003 | primary-user-loop | active | M002/S03 | none | unmapped |
 | R004 | core-capability | active | M002/S02 | M002/S04 | unmapped |
 | R005 | primary-user-loop | active | M002/S04 | none | unmapped |
@@ -322,10 +210,10 @@ This file is the explicit capability and coverage contract for the project.
 | R007 | core-capability | active | M002/S04 | M002/S06 | unmapped |
 | R008 | core-capability | active | M002/S05 | M002/S06 | unmapped |
 | R009 | launchability | active | M002/S06 | none | unmapped |
-| R010 | quality-attribute | active | M002/S06 | M002/S02,S04,S05 | unmapped |
+| R010 | quality-attribute | active | M002/S06 | M002/S02, M002/S04, M002/S05 | unmapped |
 | R011 | quality-attribute | active | M002/S04 | M002/S03 | unmapped |
 | R012 | constraint | active | M002/S04 | none | unmapped |
-| R013 | quality-attribute | active | M002/S02 | M002/S04,S05 | unmapped |
+| R013 | quality-attribute | active | M002/S02 | M002/S04, M002/S05 | unmapped |
 | R014 | core-capability | deferred | none | none | unmapped |
 | R015 | core-capability | deferred | none | none | unmapped |
 | R016 | core-capability | deferred | none | none | unmapped |
@@ -333,7 +221,7 @@ This file is the explicit capability and coverage contract for the project.
 
 ## Coverage Summary
 
-- Active requirements: 13
-- Mapped to slices: 13
-- Validated: 0 (M002 not started)
+- Active requirements: 12
+- Mapped to slices: 12
+- Validated: 1 (R001)
 - Unmapped active requirements: 0

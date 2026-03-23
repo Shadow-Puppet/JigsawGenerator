@@ -51,7 +51,7 @@ This milestone is complete only when all are true:
 
 ## Slices
 
-- [ ] **S01: Shape Library & Boolean Op Foundation** `risk:high` `depends:[]`
+- [x] **S01: Shape Library & Boolean Op Foundation** `risk:high` `depends:[]`
   > After this: unit tests prove linesweeper compiles to WASM and boolean intersection/difference works on heart and star BezPaths; shapes defined as reusable kurbo paths in puzzle-core
 
 - [ ] **S02: Boundary-Aware Grid Generation** `risk:high` `depends:[S01]`

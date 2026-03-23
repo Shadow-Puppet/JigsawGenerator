@@ -1,0 +1,1 @@
+S01 complete. Delivered heart_path and star_path BezPath constructors plus mask_intersection/mask_difference boolean op wrappers backed by linesweeper 0.3.0. 114 tests pass, WASM compilation confirmed. R001 validated. See S01-SUMMARY.md for full details.

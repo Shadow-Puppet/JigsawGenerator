@@ -35,4 +35,4 @@ See `.gsd/REQUIREMENTS.md` for the explicit capability contract, requirement sta
 ## Milestone Sequence
 
 - [x] M001: Migration — Core puzzle generator with rectangular grid, connectors, Canvas preview, SVG export
-- [ ] M002: Whimsy & Custom Borders — Mask/reverse-mask system for non-rectangular borders and whimsy piece placement with sub-puzzle splitting (planned, not started)
+- [ ] M002: Whimsy & Custom Borders — Mask/reverse-mask system for non-rectangular borders and whimsy piece placement with sub-puzzle splitting (S01 complete: shape library + boolean ops proven)
