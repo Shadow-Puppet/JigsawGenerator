@@ -6,6 +6,7 @@ pub mod edge;
 pub mod grid;
 pub mod piece;
 pub mod seed;
+pub mod shapes;
 pub mod svg_export;
 
 pub use binary_export::*;
@@ -16,6 +17,7 @@ pub use edge::*;
 pub use grid::*;
 pub use piece::*;
 pub use seed::*;
+pub use shapes::*;
 pub use svg_export::*;
 
 use serde::{Deserialize, Serialize};

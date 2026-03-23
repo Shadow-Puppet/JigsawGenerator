@@ -1,0 +1,390 @@
+{
+  "schemaVersion": 1,
+  "taskId": "T02",
+  "unitId": "M002/S03/T02",
+  "timestamp": 1774123320233,
+  "passed": true,
+  "discoverySource": "task-plan",
+  "checks": [
+    {
+      "command": "grep -q 'border_shape' web/src/main.ts",
+      "exitCode": 0,
+      "durationMs": 23,
+      "verdict": "pass"
+    }
+  ],
+  "runtimeErrors": [
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    },
+    {
+      "source": "browser",
+      "severity": "error",
+      "message": "WebSocket connection to 'ws://127.0.0.1:5174/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "blocking": false
+    }
+  ]
+}

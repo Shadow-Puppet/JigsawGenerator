@@ -8,6 +8,7 @@ serde = { version = "1.0", features = ["derive"] }
 kurbo = { version = "0.13", features = ["serde"] }
 rand = { version = "0.10", default-features = false }
 rand_chacha = "0.10"
+linesweeper = "0.3"
 
 [dev-dependencies]
 serde_json = "1.0"

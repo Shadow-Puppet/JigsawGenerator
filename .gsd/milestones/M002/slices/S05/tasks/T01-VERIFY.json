@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "taskId": "T01",
+  "unitId": "M002/S05/T01",
+  "timestamp": 1774126895096,
+  "passed": true,
+  "discoverySource": "task-plan",
+  "checks": [
+    {
+      "command": "cargo test --manifest-path crates/puzzle-wasm/Cargo.toml -- sub_piece",
+      "exitCode": 0,
+      "durationMs": 133,
+      "verdict": "pass"
+    }
+  ]
+}
