@@ -50,7 +50,7 @@
   - Done when: `BoundaryPuzzle::new()` correctly classifies cells and filters edges for heart and star boundaries; determinism test passes; whimsy difference mode works; all 114 existing tests still pass
   - **Skill:** None required — pure Rust data structures and kurbo geometry
 
-- [ ] **T02: Add boundary-aware SVG and binary export** `est:45m`
+- [x] **T02: Add boundary-aware SVG and binary export** `est:45m`
   - Why: Proves the visual output contract — shape contour replaces rectangular border in SVG; binary export sends shape contour commands and only included internal edges; completes the export pipeline for S03/S06 to consume
   - Files: `crates/puzzle-core/src/boundary.rs`, `crates/puzzle-core/src/svg_export.rs`, `crates/puzzle-core/src/binary_export.rs`
   - Do: Add `generate_boundary_svg()` function that uses the boundary shape BezPath as the border path instead of the rectangular border, then appends only included internal edge connectors. Add `boundary_edges_to_binary()` that serializes only included internal edges. Add `boundary_border_to_binary()` that serializes the shape contour path. Add tests: SVG contains shape path data (curves for heart, lines for star), SVG excludes outside edges, SVG is deterministic, binary export stride/count correctness for boundary puzzles.

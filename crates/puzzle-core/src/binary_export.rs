@@ -106,10 +106,10 @@ pub fn edges_to_binary(grid: &PuzzleGrid) -> Vec<f64> {
 }
 
 /// Command type constants for border binary encoding.
-const CMD_MOVE_TO: f64 = 0.0;
-const CMD_LINE_TO: f64 = 1.0;
-const CMD_CURVE_TO: f64 = 2.0;
-const CMD_CLOSE: f64 = 3.0;
+pub(crate) const CMD_MOVE_TO: f64 = 0.0;
+pub(crate) const CMD_LINE_TO: f64 = 1.0;
+pub(crate) const CMD_CURVE_TO: f64 = 2.0;
+pub(crate) const CMD_CLOSE: f64 = 3.0;
 
 /// Serialize the border path as a command-prefixed f64 array.
 ///
