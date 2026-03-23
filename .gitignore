@@ -22,3 +22,22 @@ Thumbs.db
 # Environment
 .env
 .env.local
+
+# ── GSD baseline (auto-generated) ──
+*.code-workspace
+.env.*
+!.env.example
+node_modules/
+.next/
+dist/
+build/
+__pycache__/
+*.pyc
+.venv/
+venv/
+target/
+vendor/
+*.log
+coverage/
+.cache/
+tmp/
