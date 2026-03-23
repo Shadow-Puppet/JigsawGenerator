@@ -40,7 +40,7 @@
   - Verify: `cargo test --manifest-path crates/puzzle-core/Cargo.toml` passes (all 105 existing + new shape tests), `cargo check --manifest-path crates/puzzle-wasm/Cargo.toml --target wasm32-unknown-unknown` succeeds
   - Done when: shapes.rs exists with heart_path and star_path, both produce valid closed BezPaths, all tests pass, WASM compilation succeeds
 
-- [ ] **T02: Build masking wrappers with boolean op integration tests** `est:30m`
+- [x] **T02: Build masking wrappers with boolean op integration tests** `est:30m`
   - Why: Provides the thin masking API (intersection and difference) that S02-S05 consume for grid clipping, border masking, and whimsy placement. Proves linesweeper boolean ops produce correct, deterministic output on the shapes from T01.
   - Files: `crates/puzzle-core/src/masking.rs`, `crates/puzzle-core/src/lib.rs`
   - Do: Create `masking.rs` with `mask_intersection(base: &BezPath, shape: &BezPath) -> Result<BezPath, String>` and `mask_difference(base: &BezPath, shape: &BezPath) -> Result<BezPath, String>`. Both call `linesweeper::binary_op` with `FillRule::EvenOdd` and the appropriate `BinaryOp` variant. Convert `linesweeper::topology::Contours` result to a single `BezPath` by iterating `.contours()` and appending each contour's `.path` elements. Map `linesweeper::Error` to `String` via `.to_string()`. Add `pub mod masking;` and `pub use masking::*;` to lib.rs. Include unit tests: intersection of rectangle + heart produces non-empty path, difference of rectangle - star produces non-empty path, results are deterministic (call twice with same inputs, compare BezPath SVG output), empty intersection (non-overlapping shapes) produces empty path.

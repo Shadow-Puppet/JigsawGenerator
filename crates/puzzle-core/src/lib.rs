@@ -6,6 +6,7 @@ pub mod edge;
 pub mod grid;
 pub mod piece;
 pub mod seed;
+pub mod masking;
 pub mod shapes;
 pub mod svg_export;
 
@@ -17,6 +18,7 @@ pub use edge::*;
 pub use grid::*;
 pub use piece::*;
 pub use seed::*;
+pub use masking::*;
 pub use shapes::*;
 pub use svg_export::*;
 
