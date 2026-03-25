@@ -361,7 +361,7 @@ pub fn generate_edges_binary(config_json: &str) -> JsValue {
     grid.generate_connectors(&ClassicKnobConnector);
 
     // 4-5. Generate SVG + binary data (boundary-aware when shape is set)
-    let (svg, edges_data, border_data) = if let Some(ref shape_name) = border_shape {
+    let (svg, edges_data, border_data, piece_count) = if let Some(ref shape_name) = border_shape {
         let boundary = match resolve_border_shape(shape_name, width, height) {
             Ok(b) => b,
             Err(e) => {
@@ -375,15 +375,19 @@ pub fn generate_edges_binary(config_json: &str) -> JsValue {
             }
         };
         let bp = BoundaryPuzzle::new(grid, boundary);
+        let count = bp.included_cells().len();
         let svg = bp.generate_boundary_svg();
         let edges = bp.boundary_edges_to_binary();
         let border = bp.boundary_border_to_binary();
-        (svg, edges, border)
+        (svg, edges, border, count)
     } else {
+        let rows = grid.config.rows as usize;
+        let cols = grid.config.cols as usize;
+        let count = rows * cols;
         let svg = puzzle_core::generate_svg(&grid);
         let edges = edges_to_binary(&grid);
         let border = border_to_binary(&grid);
-        (svg, edges, border)
+        (svg, edges, border, count)
     };
 
     // Cache SVG for retrieval via get_cached_svg()
@@ -407,6 +411,11 @@ pub fn generate_edges_binary(config_json: &str) -> JsValue {
         &obj,
         &JsValue::from_str("height"),
         &JsValue::from_f64(height),
+    );
+    let _ = js_sys::Reflect::set(
+        &obj,
+        &JsValue::from_str("piece_count"),
+        &JsValue::from_f64(piece_count as f64),
     );
 
     obj.into()
@@ -803,4 +812,82 @@ mod tests {
             "same seed + heart border must produce identical SVG"
         );
     }
+
+    // ─── piece_count Tests ───────────────────────────────────────
+
+    /// Verify the piece count logic that generate_edges_binary uses.
+    ///
+    /// generate_edges_binary returns JsValue which cannot be inspected in
+    /// native tests (Reflect::get panics on non-wasm targets). Instead we
+    /// verify the same logic via generate_grid (which returns JSON) and
+    /// confirm WASM compilation via `cargo check --target wasm32-unknown-unknown`.
+    #[test]
+    fn test_piece_count_rectangular() {
+        // For rectangular puzzles, piece_count should equal rows * cols.
+        let config_json = r#"{"rows":4,"cols":5,"width":200.0,"height":150.0,"unit":"Millimeters","tab":{"size_pct":0.25},"seed":"pc-rect"}"#;
+        let result = generate_grid(config_json);
+        let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+        let total = parsed["piece_breakdown"]["total"].as_u64().unwrap();
+        assert_eq!(total, 4 * 5, "rectangular piece count should be rows * cols");
+    }
+
+    #[test]
+    fn test_piece_count_heart_border() {
+        // For heart-bordered puzzles, piece_count should be less than rows * cols
+        // but greater than zero (some cells are excluded by the boundary).
+        let config_json = r#"{"rows":6,"cols":8,"width":200.0,"height":150.0,"unit":"Millimeters","tab":{"size_pct":0.25},"seed":"pc-heart","border_shape":"heart"}"#;
+        let result = generate_grid(config_json);
+        let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+        let total = parsed["piece_breakdown"]["total"].as_u64().unwrap();
+
+        assert!(total > 0, "heart border should have some pieces, got 0");
+        assert!(
+            total < 6 * 8,
+            "heart border should have fewer pieces than full grid ({}), got {}",
+            6 * 8,
+            total
+        );
+    }
+
+    #[test]
+    fn test_piece_count_star_border() {
+        // Star border should also have fewer pieces than the full grid.
+        let config_json = r#"{"rows":6,"cols":8,"width":200.0,"height":150.0,"unit":"Millimeters","tab":{"size_pct":0.25},"seed":"pc-star","border_shape":"star"}"#;
+        let result = generate_grid(config_json);
+        let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+        let total = parsed["piece_breakdown"]["total"].as_u64().unwrap();
+
+        assert!(total > 0, "star border should have some pieces, got 0");
+        assert!(
+            total < 6 * 8,
+            "star border should have fewer pieces than full grid ({}), got {}",
+            6 * 8,
+            total
+        );
+    }
+
+    #[test]
+    fn test_piece_count_matches_pieces_array_length() {
+        // The piece_breakdown.total should match the actual pieces array length
+        // for both rectangular and boundary puzzles.
+        let configs = [
+            r#"{"rows":4,"cols":5,"width":200.0,"height":150.0,"unit":"Millimeters","tab":{"size_pct":0.25},"seed":"pc-match"}"#,
+            r#"{"rows":6,"cols":8,"width":200.0,"height":150.0,"unit":"Millimeters","tab":{"size_pct":0.25},"seed":"pc-match","border_shape":"heart"}"#,
+            r#"{"rows":6,"cols":8,"width":200.0,"height":150.0,"unit":"Millimeters","tab":{"size_pct":0.25},"seed":"pc-match","border_shape":"star"}"#,
+        ];
+
+        for config in &configs {
+            let result = generate_grid(config);
+            assert!(!result.contains(r#""error""#), "error for config: {}", config);
+            let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+            let total = parsed["piece_breakdown"]["total"].as_u64().unwrap();
+            let pieces_len = parsed["pieces"].as_array().unwrap().len() as u64;
+            assert_eq!(
+                total, pieces_len,
+                "piece_breakdown.total should match pieces array length for config: {}",
+                config
+            );
+        }
+    }
+
 }

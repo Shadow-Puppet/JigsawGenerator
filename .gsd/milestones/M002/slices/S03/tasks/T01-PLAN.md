@@ -58,3 +58,10 @@ The change is small: after building the result JS object (which already has `edg
 ## Expected Output
 
 - `crates/puzzle-wasm/src/lib.rs` — modified to include `piece_count` in `generate_edges_binary()` return object, plus new test
+
+## Observability Impact
+
+- **New signal:** `generate_edges_binary()` JS response object now includes `piece_count` (f64). For rectangular puzzles this equals `rows * cols`; for boundary puzzles it equals the number of cells inside the boundary shape.
+- **Inspection:** In the browser console after a WASM call, `result.piece_count` shows the actual piece count. Compare with `rows * cols` to verify boundary filtering is active: if they're equal when a non-rectangular border is selected, the boundary computation failed silently.
+- **Failure state:** If `piece_count` is missing (e.g. an older WASM build), the frontend should fall back to `rows * cols` and log a warning. The `generate_grid()` JSON endpoint's `piece_breakdown.total` can be used for cross-verification.
+- **Test coverage:** 4 new tests verify piece count correctness for rectangular, heart, and star borders, plus array/total consistency. The `generate_edges_binary` function itself cannot be tested in native mode (JsValue panics on non-wasm targets) but compiles cleanly for `wasm32-unknown-unknown`.

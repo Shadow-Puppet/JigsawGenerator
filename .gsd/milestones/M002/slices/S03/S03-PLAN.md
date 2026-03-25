@@ -44,7 +44,7 @@
 
 ## Tasks
 
-- [ ] **T01: Add piece_count to WASM generate_edges_binary response** `est:15m`
+- [x] **T01: Add piece_count to WASM generate_edges_binary response** `est:15m`
   - Why: The JS currently computes `rows * cols` for piece count, which is wrong for boundary puzzles. The WASM layer already knows the real count from BoundaryPuzzle filtering. Adding `piece_count` to the response gives the frontend accurate data.
   - Files: `crates/puzzle-wasm/src/lib.rs`
   - Do: Add `piece_count` field (u32) to the JS object returned by `generate_edges_binary()`. For boundary puzzles, compute from `BoundaryPuzzle::included_cell_count()`. For rectangular puzzles, use `rows * cols`. Add a test that verifies heart border returns `piece_count < rows * cols` and rectangular returns `piece_count == rows * cols`.
