@@ -4,17 +4,6 @@ This file is the explicit capability and coverage contract for the project.
 
 ## Active
 
-### R002 — Given a closed BezPath boundary, generate a puzzle grid where edges are clipped to the boundary and pieces outside are removed. Grid adapts piece count to fill the shape naturally.
-- Class: core-capability
-- Status: active
-- Description: Given a closed BezPath boundary, generate a puzzle grid where edges are clipped to the boundary and pieces outside are removed. Grid adapts piece count to fill the shape naturally.
-- Why it matters: Core geometric primitive that enables both custom borders (mask mode) and whimsy sub-puzzles (mask mode inside whimsy contour)
-- Source: user
-- Primary owning slice: M002/S02
-- Supporting slices: M002/S03, M002/S05
-- Validation: unmapped
-- Notes: Uses linesweeper for boolean path ops on kurbo BezPaths
-
 ### R003 — User picks a shape from the library as the puzzle's outer boundary. The grid generates inside that shape with adapted piece count.
 - Class: primary-user-loop
 - Status: active
@@ -25,17 +14,6 @@ This file is the explicit capability and coverage contract for the project.
 - Supporting slices: none
 - Validation: unmapped
 - Notes: Shape selection via UI dropdown; preview updates live
-
-### R004 — Given a placed whimsy shape, remove all grid edges that fall inside it. Grid edges terminate at the whimsy boundary. The whimsy boundary itself is the cut line — no tab connectors at the boundary.
-- Class: core-capability
-- Status: active
-- Description: Given a placed whimsy shape, remove all grid edges that fall inside it. Grid edges terminate at the whimsy boundary. The whimsy boundary itself is the cut line — no tab connectors at the boundary.
-- Why it matters: Core geometric primitive for whimsy placement — creates the "hole" in the grid where the whimsy piece sits
-- Source: user
-- Primary owning slice: M002/S02
-- Supporting slices: M002/S04
-- Validation: unmapped
-- Notes: Same boolean op engine as mask, just keeping the opposite side
 
 ### R005 — User drags a shape from the library onto the puzzle grid preview, positioning it freely anywhere (no grid snap)
 - Class: primary-user-loop
@@ -125,17 +103,6 @@ This file is the explicit capability and coverage contract for the project.
 - Validation: unmapped
 - Notes: Multiple whimsy deferred to R014
 
-### R013 — Same seed + same whimsy config + same border = identical output. Determinism extends to all new geometry.
-- Class: quality-attribute
-- Status: active
-- Description: Same seed + same whimsy config + same border = identical output. Determinism extends to all new geometry.
-- Why it matters: Users share and reproduce puzzles via seeds — breaking determinism breaks a validated capability
-- Source: inferred
-- Primary owning slice: M002/S02
-- Supporting slices: M002/S04, M002/S05
-- Validation: unmapped
-- Notes: New RNG streams for whimsy/border operations must be isolated from existing grid/connector RNG
-
 ## Validated
 
 ### R001 — Heart and star shapes defined as kurbo BezPaths in the Rust core, available for both border and whimsy use
@@ -148,6 +115,39 @@ This file is the explicit capability and coverage contract for the project.
 - Supporting slices: M002/S02, M002/S03, M002/S04
 - Validation: S01 delivered heart_path and star_path as kurbo BezPaths in puzzle-core/shapes.rs, plus mask_intersection and mask_difference wrappers in masking.rs. 114 tests pass (5 shape + 4 masking + 105 existing). WASM compilation of full dependency tree confirmed via cargo check --target wasm32-unknown-unknown on puzzle-wasm.
 - Notes: Start with heart + star; library is extensible for future shapes
+
+### R002 — Given a closed BezPath boundary, generate a puzzle grid where edges are clipped to the boundary and pieces outside are removed. Grid adapts piece count to fill the shape naturally.
+- Class: core-capability
+- Status: validated
+- Description: Given a closed BezPath boundary, generate a puzzle grid where edges are clipped to the boundary and pieces outside are removed. Grid adapts piece count to fill the shape naturally.
+- Why it matters: Core geometric primitive that enables both custom borders (mask mode) and whimsy sub-puzzles (mask mode inside whimsy contour)
+- Source: user
+- Primary owning slice: M002/S02
+- Supporting slices: M002/S03, M002/S05
+- Validation: S02 delivered BoundaryPuzzle engine: kurbo winding-number cell classification, edge filtering (included_h_edges/included_v_edges), boundary-aware SVG export with shape contour as border, binary export for included edges only. WASM endpoints accept border_shape parameter. 19 boundary tests + 9 WASM boundary tests pass. Heart SVG contains cubic bezier curves; star SVG contains line segments. Cells outside boundary excluded; only edges between two inside cells included.
+- Notes: Uses linesweeper for boolean path ops on kurbo BezPaths
+
+### R004 — Given a placed whimsy shape, remove all grid edges that fall inside it. Grid edges terminate at the whimsy boundary. The whimsy boundary itself is the cut line — no tab connectors at the boundary.
+- Class: core-capability
+- Status: validated
+- Description: Given a placed whimsy shape, remove all grid edges that fall inside it. Grid edges terminate at the whimsy boundary. The whimsy boundary itself is the cut line — no tab connectors at the boundary.
+- Why it matters: Core geometric primitive for whimsy placement — creates the "hole" in the grid where the whimsy piece sits
+- Source: user
+- Primary owning slice: M002/S02
+- Supporting slices: M002/S04
+- Validation: S02 delivered BoundaryPuzzle::new_with_hole() for whimsy difference mode: cell must be inside boundary AND outside hole to be included. test_boundary_hole_removes_center_cells proves center cells are excluded when a hole shape is placed. Grid edges terminate at whimsy boundary — no tab connectors at boundary edges (border edges always excluded from internal edge output).
+- Notes: Same boolean op engine as mask, just keeping the opposite side
+
+### R013 — Same seed + same whimsy config + same border = identical output. Determinism extends to all new geometry.
+- Class: quality-attribute
+- Status: validated
+- Description: Same seed + same whimsy config + same border = identical output. Determinism extends to all new geometry.
+- Why it matters: Users share and reproduce puzzles via seeds — breaking determinism breaks a validated capability
+- Source: inferred
+- Primary owning slice: M002/S02
+- Supporting slices: M002/S04, M002/S05
+- Validation: S02 proves determinism: test_boundary_determinism (same seed + same boundary = identical cell inclusion and edge indices), test_boundary_svg_deterministic (same seed = identical SVG output), test_boundary_binary_edges_deterministic (same seed = identical binary), test_generate_svg_heart_border_deterministic (WASM endpoint determinism). Full rectangular grid generated first, then filtered — RNG sequence independent of boundary shape (D024).
+- Notes: New RNG streams for whimsy/border operations must be isolated from existing grid/connector RNG
 
 ## Deferred
 
@@ -202,9 +202,9 @@ This file is the explicit capability and coverage contract for the project.
 | ID | Class | Status | Primary owner | Supporting | Proof |
 |---|---|---|---|---|---|
 | R001 | core-capability | validated | M002/S01 | M002/S02, M002/S03, M002/S04 | S01 delivered heart_path and star_path as kurbo BezPaths in puzzle-core/shapes.rs, plus mask_intersection and mask_difference wrappers in masking.rs. 114 tests pass (5 shape + 4 masking + 105 existing). WASM compilation of full dependency tree confirmed via cargo check --target wasm32-unknown-unknown on puzzle-wasm. |
-| R002 | core-capability | active | M002/S02 | M002/S03, M002/S05 | unmapped |
+| R002 | core-capability | validated | M002/S02 | M002/S03, M002/S05 | S02 delivered BoundaryPuzzle engine: kurbo winding-number cell classification, edge filtering (included_h_edges/included_v_edges), boundary-aware SVG export with shape contour as border, binary export for included edges only. WASM endpoints accept border_shape parameter. 19 boundary tests + 9 WASM boundary tests pass. Heart SVG contains cubic bezier curves; star SVG contains line segments. Cells outside boundary excluded; only edges between two inside cells included. |
 | R003 | primary-user-loop | active | M002/S03 | none | unmapped |
-| R004 | core-capability | active | M002/S02 | M002/S04 | unmapped |
+| R004 | core-capability | validated | M002/S02 | M002/S04 | S02 delivered BoundaryPuzzle::new_with_hole() for whimsy difference mode: cell must be inside boundary AND outside hole to be included. test_boundary_hole_removes_center_cells proves center cells are excluded when a hole shape is placed. Grid edges terminate at whimsy boundary — no tab connectors at boundary edges (border edges always excluded from internal edge output). |
 | R005 | primary-user-loop | active | M002/S04 | none | unmapped |
 | R006 | primary-user-loop | active | M002/S04 | none | unmapped |
 | R007 | core-capability | active | M002/S04 | M002/S06 | unmapped |
@@ -213,7 +213,7 @@ This file is the explicit capability and coverage contract for the project.
 | R010 | quality-attribute | active | M002/S06 | M002/S02, M002/S04, M002/S05 | unmapped |
 | R011 | quality-attribute | active | M002/S04 | M002/S03 | unmapped |
 | R012 | constraint | active | M002/S04 | none | unmapped |
-| R013 | quality-attribute | active | M002/S02 | M002/S04, M002/S05 | unmapped |
+| R013 | quality-attribute | validated | M002/S02 | M002/S04, M002/S05 | S02 proves determinism: test_boundary_determinism (same seed + same boundary = identical cell inclusion and edge indices), test_boundary_svg_deterministic (same seed = identical SVG output), test_boundary_binary_edges_deterministic (same seed = identical binary), test_generate_svg_heart_border_deterministic (WASM endpoint determinism). Full rectangular grid generated first, then filtered — RNG sequence independent of boundary shape (D024). |
 | R014 | core-capability | deferred | none | none | unmapped |
 | R015 | core-capability | deferred | none | none | unmapped |
 | R016 | core-capability | deferred | none | none | unmapped |
@@ -221,7 +221,7 @@ This file is the explicit capability and coverage contract for the project.
 
 ## Coverage Summary
 
-- Active requirements: 12
-- Mapped to slices: 12
-- Validated: 1 (R001)
+- Active requirements: 9
+- Mapped to slices: 9
+- Validated: 4 (R001, R002, R004, R013)
 - Unmapped active requirements: 0

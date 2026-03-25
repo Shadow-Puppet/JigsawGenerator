@@ -32,3 +32,15 @@
 **Source:** M002/S01/T01
 **Context:** The biggest risk for M002 was whether linesweeper (and its transitive deps) would compile to WASM. It does, cleanly, with no feature flag changes or workarounds needed.
 **Lesson:** This risk is fully retired. Future slices can assume WASM compilation works for the boolean op stack.
+
+## K006 — js_sys APIs panic on native test targets; test WASM binary endpoints via SVG/shape-resolution proxies
+
+**Source:** M002/S02/T03
+**Context:** `js_sys::Float64Array`, `js_sys::Reflect::get`, and similar APIs panic when run in native Rust tests (not in actual WASM runtime). This means WASM endpoints that return JsValue with binary data can't be directly tested with `cargo test`.
+**Lesson:** Test binary WASM endpoints indirectly: (1) test the underlying Rust binary export functions thoroughly in puzzle-core, (2) test shape resolution and SVG output in puzzle-wasm since those work natively, (3) rely on `cargo check --target wasm32-unknown-unknown` for compilation verification. The SVG and binary code paths share the same branching pattern, so SVG tests validate the routing logic.
+
+## K007 — Boundary cell containment uses kurbo winding number, not boolean ops
+
+**Source:** M002/S02/T01
+**Context:** For cell classification in `BoundaryPuzzle`, the plan initially suggested using linesweeper boolean intersection. Instead, `kurbo::Shape::winding()` on cell center points is much simpler and faster — it's a point-in-path test, not a full boolean path operation. Winding number > 0 means inside (nonzero winding rule).
+**Lesson:** Reserve linesweeper boolean ops for path-vs-path operations (masking, difference). For point containment tests, use kurbo's built-in `winding()` method directly on the BezPath.

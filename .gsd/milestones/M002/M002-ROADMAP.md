@@ -54,7 +54,7 @@ This milestone is complete only when all are true:
 - [x] **S01: Shape Library & Boolean Op Foundation** `risk:high` `depends:[]`
   > After this: unit tests prove linesweeper compiles to WASM and boolean intersection/difference works on heart and star BezPaths; shapes defined as reusable kurbo paths in puzzle-core
 
-- [ ] **S02: Boundary-Aware Grid Generation** `risk:high` `depends:[S01]`
+- [x] **S02: Boundary-Aware Grid Generation** `risk:high` `depends:[S01]`
   > After this: WASM endpoint generates a puzzle grid clipped to a non-rectangular boundary; SVG export shows a heart-shaped puzzle with valid connectors and correct edge trimming
 
 - [ ] **S03: Custom Border UI** `risk:medium` `depends:[S02]`
