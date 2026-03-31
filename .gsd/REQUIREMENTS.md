@@ -4,17 +4,6 @@ This file is the explicit capability and coverage contract for the project.
 
 ## Active
 
-### R003 — User picks a shape from the library as the puzzle's outer boundary. The grid generates inside that shape with adapted piece count.
-- Class: primary-user-loop
-- Status: active
-- Description: User picks a shape from the library as the puzzle's outer boundary. The grid generates inside that shape with adapted piece count.
-- Why it matters: First user-visible feature that uses the mask operation — transforms the rectangular puzzle into arbitrary shapes
-- Source: user
-- Primary owning slice: M002/S03
-- Supporting slices: none
-- Validation: unmapped
-- Notes: Shape selection via UI dropdown; preview updates live
-
 ### R005 — User drags a shape from the library onto the puzzle grid preview, positioning it freely anywhere (no grid snap)
 - Class: primary-user-loop
 - Status: active
@@ -127,6 +116,17 @@ This file is the explicit capability and coverage contract for the project.
 - Validation: S02 delivered BoundaryPuzzle engine: kurbo winding-number cell classification, edge filtering (included_h_edges/included_v_edges), boundary-aware SVG export with shape contour as border, binary export for included edges only. WASM endpoints accept border_shape parameter. 19 boundary tests + 9 WASM boundary tests pass. Heart SVG contains cubic bezier curves; star SVG contains line segments. Cells outside boundary excluded; only edges between two inside cells included.
 - Notes: Uses linesweeper for boolean path ops on kurbo BezPaths
 
+### R003 — User picks a shape from the library as the puzzle's outer boundary. The grid generates inside that shape with adapted piece count.
+- Class: primary-user-loop
+- Status: validated
+- Description: User picks a shape from the library as the puzzle's outer boundary. The grid generates inside that shape with adapted piece count.
+- Why it matters: First user-visible feature that uses the mask operation — transforms the rectangular puzzle into arbitrary shapes
+- Source: user
+- Primary owning slice: M002/S03
+- Supporting slices: none
+- Validation: S03 delivered: border shape dropdown (Rectangle/Heart/Star) in web UI, buildConfig() passes border_shape to WASM, piece count display uses WASM-returned piece_count (accurate for boundary puzzles), URL param 'border' persists selection across reloads, download filename includes shape name. All 26 WASM tests pass, WASM compiles clean, grep checks confirm all integration points wired.
+- Notes: Shape selection via UI dropdown; preview updates live
+
 ### R004 — Given a placed whimsy shape, remove all grid edges that fall inside it. Grid edges terminate at the whimsy boundary. The whimsy boundary itself is the cut line — no tab connectors at the boundary.
 - Class: core-capability
 - Status: validated
@@ -203,7 +203,7 @@ This file is the explicit capability and coverage contract for the project.
 |---|---|---|---|---|---|
 | R001 | core-capability | validated | M002/S01 | M002/S02, M002/S03, M002/S04 | S01 delivered heart_path and star_path as kurbo BezPaths in puzzle-core/shapes.rs, plus mask_intersection and mask_difference wrappers in masking.rs. 114 tests pass (5 shape + 4 masking + 105 existing). WASM compilation of full dependency tree confirmed via cargo check --target wasm32-unknown-unknown on puzzle-wasm. |
 | R002 | core-capability | validated | M002/S02 | M002/S03, M002/S05 | S02 delivered BoundaryPuzzle engine: kurbo winding-number cell classification, edge filtering (included_h_edges/included_v_edges), boundary-aware SVG export with shape contour as border, binary export for included edges only. WASM endpoints accept border_shape parameter. 19 boundary tests + 9 WASM boundary tests pass. Heart SVG contains cubic bezier curves; star SVG contains line segments. Cells outside boundary excluded; only edges between two inside cells included. |
-| R003 | primary-user-loop | active | M002/S03 | none | unmapped |
+| R003 | primary-user-loop | validated | M002/S03 | none | S03 delivered: border shape dropdown (Rectangle/Heart/Star) in web UI, buildConfig() passes border_shape to WASM, piece count display uses WASM-returned piece_count (accurate for boundary puzzles), URL param 'border' persists selection across reloads, download filename includes shape name. All 26 WASM tests pass, WASM compiles clean, grep checks confirm all integration points wired. |
 | R004 | core-capability | validated | M002/S02 | M002/S04 | S02 delivered BoundaryPuzzle::new_with_hole() for whimsy difference mode: cell must be inside boundary AND outside hole to be included. test_boundary_hole_removes_center_cells proves center cells are excluded when a hole shape is placed. Grid edges terminate at whimsy boundary — no tab connectors at boundary edges (border edges always excluded from internal edge output). |
 | R005 | primary-user-loop | active | M002/S04 | none | unmapped |
 | R006 | primary-user-loop | active | M002/S04 | none | unmapped |
@@ -221,7 +221,7 @@ This file is the explicit capability and coverage contract for the project.
 
 ## Coverage Summary
 
-- Active requirements: 9
-- Mapped to slices: 9
-- Validated: 4 (R001, R002, R004, R013)
+- Active requirements: 8
+- Mapped to slices: 8
+- Validated: 5 (R001, R002, R003, R004, R013)
 - Unmapped active requirements: 0

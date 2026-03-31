@@ -57,7 +57,7 @@ This milestone is complete only when all are true:
 - [x] **S02: Boundary-Aware Grid Generation** `risk:high` `depends:[S01]`
   > After this: WASM endpoint generates a puzzle grid clipped to a non-rectangular boundary; SVG export shows a heart-shaped puzzle with valid connectors and correct edge trimming
 
-- [ ] **S03: Custom Border UI** `risk:medium` `depends:[S02]`
+- [x] **S03: Custom Border UI** `risk:medium` `depends:[S02]`
   > After this: user selects a border shape from a dropdown in the web UI, Canvas preview shows the non-rectangular puzzle, and exported SVG has the correct outline
 
 - [ ] **S04: Whimsy Drag-Drop & Grid Adaptation** `risk:medium` `depends:[S02]`
