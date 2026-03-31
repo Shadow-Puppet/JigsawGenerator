@@ -51,7 +51,7 @@
   - Verify: `cargo test --manifest-path crates/puzzle-wasm/Cargo.toml` passes all tests; `cargo check --manifest-path crates/puzzle-wasm/Cargo.toml --target wasm32-unknown-unknown` compiles
   - Done when: `generate_edges_binary()` returns a JS object with `piece_count` field for both rectangular and boundary puzzles, and tests confirm the count is correct
 
-- [ ] **T02: Add border shape dropdown, wire config/URL, fix piece count display** `est:30m`
+- [x] **T02: Add border shape dropdown, wire config/URL, fix piece count display** `est:30m`
   - Why: This is the user-facing feature — a dropdown to select border shape, wiring through to WASM, correct piece count display, and URL persistence. Without this, the WASM border support from S02 is invisible to users.
   - Files: `web/index.html`, `web/src/main.ts`
   - Do: (1) Add `<select id="border-shape">` dropdown in HTML with Rectangle/Heart/Star options. (2) Add `borderShapeSelect` DOM reference and wire `change` event to `scheduleGenerate()`. (3) Update `buildConfig()` to include `border_shape` when not rectangular. (4) Update `generatePuzzle()` to use `result.piece_count` from WASM instead of JS-computed breakdown. (5) Update `loadFromURL()` to restore border shape from `border` URL param. (6) Update `updateURL()` to persist `border` param. (7) Include border in download filename when shape is active.
