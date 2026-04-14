@@ -22,3 +22,20 @@ Thumbs.db
 # Environment
 .env
 .env.local
+.env.*
+!.env.example
+
+# Agent / planning / scratch
+.gsd/
+.planning/
+.claude/
+.bg-shell/
+.artifacts/
+CLAUDE.md
+
+# Build / cache
+*.code-workspace
+*.log
+coverage/
+.cache/
+tmp/
