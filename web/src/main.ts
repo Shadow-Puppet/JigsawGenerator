@@ -34,6 +34,8 @@ let taperTrack: HTMLElement;
 let offsetSlider: HTMLInputElement;
 let offsetReadout: HTMLElement;
 
+let borderShapeSelect: HTMLSelectElement;
+
 let pieceTargetInput: HTMLInputElement;
 let pieceSizeWarning: HTMLElement;
 let gridLockCheckbox: HTMLInputElement;
@@ -88,7 +90,7 @@ function buildConfig(): object {
     tabConfig.taper_max = 0.57 + parseFloat(taperMaxSlider.value) * 0.75;
   }
   tabConfig.offset = parseFloat(offsetSlider.value);
-  return {
+  const config: Record<string, unknown> = {
     rows: parseInt(rowsInput.value, 10),
     cols: parseInt(colsInput.value, 10),
     width: parseFloat(widthInput.value),
@@ -97,6 +99,11 @@ function buildConfig(): object {
     tab: tabConfig,
     seed: seedInput.value,
   };
+  const borderVal = borderShapeSelect.value;
+  if (borderVal) {
+    config.border_shape = borderVal;
+  }
+  return config;
 }
 
 // ─── URL Param Sync ──────────────────────────────────────────
@@ -146,6 +153,10 @@ function loadFromURL(): boolean {
   const offset = Math.max(0, Math.min(0.20, offsetVal));
   offsetSlider.value = String(offset);
 
+  // Restore border shape
+  const border = params.get("border") ?? "";
+  borderShapeSelect.value = border;
+
   return true;
 }
 
@@ -170,6 +181,10 @@ function updateURL(): void {
     params.set("tapermax", String(Math.round(parseFloat(taperMaxSlider.value) * 100)));
   }
   params.set("off", String(Math.round(parseFloat(offsetSlider.value) * 100)));
+  const borderVal = borderShapeSelect.value;
+  if (borderVal) {
+    params.set("border", borderVal);
+  }
   history.replaceState(null, "", "?" + params.toString());
 }
 
@@ -439,14 +454,26 @@ function generatePuzzle(): void {
 
   errorDisplay.style.display = "none";
 
-  // Compute piece breakdown in JS
-  const rows = parseInt(rowsInput.value, 10);
-  const cols = parseInt(colsInput.value, 10);
-  const total = rows * cols;
-  const corners = 4;
-  const edges = 2 * (rows - 2) + 2 * (cols - 2);
-  const interior = (rows - 2) * (cols - 2);
-  pieceCount.textContent = `${total} pieces (${corners} corner, ${edges} edge, ${interior} interior)`;
+  // Use WASM-returned piece count (accurate for boundary puzzles)
+  const count = result.piece_count as number | undefined;
+  const borderVal = borderShapeSelect.value;
+  if (count != null) {
+    if (borderVal) {
+      pieceCount.textContent = `${count} pieces (${borderVal} border)`;
+    } else {
+      const rows = parseInt(rowsInput.value, 10);
+      const cols = parseInt(colsInput.value, 10);
+      const corners = 4;
+      const edges = 2 * (rows - 2) + 2 * (cols - 2);
+      const interior = (rows - 2) * (cols - 2);
+      pieceCount.textContent = `${count} pieces (${corners} corner, ${edges} edge, ${interior} interior)`;
+    }
+  } else {
+    console.warn("piece_count missing from WASM response — falling back to rows * cols");
+    const rows = parseInt(rowsInput.value, 10);
+    const cols = parseInt(colsInput.value, 10);
+    pieceCount.textContent = `${rows * cols} pieces`;
+  }
 
   // Resize canvas and draw
   resizeCanvas();
@@ -867,6 +894,8 @@ async function main(): Promise<void> {
   offsetSlider = document.getElementById("offset") as HTMLInputElement;
   offsetReadout = document.getElementById("offset-readout")!;
 
+  borderShapeSelect = document.getElementById("border-shape") as HTMLSelectElement;
+
   pieceTargetInput = document.getElementById("piece-target") as HTMLInputElement;
   pieceSizeWarning = document.getElementById("piece-size-warning")!;
   gridLockCheckbox = document.getElementById("grid-lock") as HTMLInputElement;
@@ -994,6 +1023,9 @@ async function main(): Promise<void> {
     generatePuzzle();
     enforceConstraints("dims");
   });
+
+  // Border shape select — regenerate puzzle with new shape
+  borderShapeSelect.addEventListener("change", scheduleGenerate);
 
   // Seed text input
   seedInput.addEventListener("input", scheduleGenerate);
@@ -1155,7 +1187,9 @@ async function main(): Promise<void> {
     const svgContent = get_cached_svg();
     if (!svgContent || !svgContent.startsWith("<svg")) return;
     const config = buildConfig() as Record<string, unknown>;
-    const filename = `puzzle-${config.rows}x${config.cols}-seed-${config.seed}.svg`;
+    const border = config.border_shape as string | undefined;
+    const shapeSuffix = border ? `-${border}` : "";
+    const filename = `puzzle-${config.rows}x${config.cols}${shapeSuffix}-seed-${config.seed}.svg`;
     const blob = new Blob([svgContent], { type: "image/svg+xml" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");

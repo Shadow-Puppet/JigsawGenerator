@@ -208,6 +208,11 @@ pub struct PuzzleConfig {
     pub tab: TabConfig,
     /// User seed string (empty = auto-generate).
     pub seed: String,
+    /// Optional border shape name (e.g. "heart", "star").
+    /// When present, the puzzle grid is clipped to the named shape boundary.
+    /// When absent or null, a standard rectangular puzzle is generated.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub border_shape: Option<String>,
 }
 
 impl Default for PuzzleConfig {
@@ -220,6 +225,7 @@ impl Default for PuzzleConfig {
             unit: Unit::Millimeters,
             tab: TabConfig::default(),
             seed: String::new(),
+            border_shape: None,
         }
     }
 }
@@ -266,6 +272,7 @@ impl PuzzleConfig {
             unit,
             tab,
             seed,
+            border_shape: None,
         };
         config.validate()?;
         Ok(config)

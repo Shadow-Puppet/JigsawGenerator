@@ -137,7 +137,7 @@ fn build_connector_paths(grid: &PuzzleGrid) -> BezPath {
 ///
 /// Edge-local: origin at edge start, x-axis along edge direction.
 /// Global: the puzzle coordinate system in mm.
-pub(crate) fn edge_transform(start: Point, end: Point) -> Affine {
+pub fn edge_transform(start: Point, end: Point) -> Affine {
     let angle = (end.y - start.y).atan2(end.x - start.x);
     Affine::translate(start.to_vec2()) * Affine::rotate(angle)
 }
@@ -149,7 +149,7 @@ pub(crate) fn edge_transform(start: Point, end: Point) -> Affine {
 /// - Matching `viewBox` for 1:1 mm coordinate mapping
 /// - Single `<path>` element with hairline black stroke
 /// - No fill, no metadata, no title/desc
-fn build_svg_document(path_data: &str, width_mm: f64, height_mm: f64) -> String {
+pub(crate) fn build_svg_document(path_data: &str, width_mm: f64, height_mm: f64) -> String {
     format!(
         "<svg xmlns='http://www.w3.org/2000/svg' width='{w}mm' height='{h}mm' viewBox='0 0 {w} {h}'>\
          <path d='{d}' stroke='#000000' stroke-width='0.001mm' fill='none'/>\
@@ -176,6 +176,7 @@ mod tests {
             unit: Unit::Millimeters,
             tab: TabConfig::default(),
             seed: seed.to_string(),
+            border_shape: None,
         }
     }
 

@@ -1,4 +1,5 @@
 pub mod binary_export;
+pub mod boundary;
 pub mod classic_connector;
 pub mod config;
 pub mod connector;
@@ -6,9 +7,12 @@ pub mod edge;
 pub mod grid;
 pub mod piece;
 pub mod seed;
+pub mod masking;
+pub mod shapes;
 pub mod svg_export;
 
 pub use binary_export::*;
+pub use boundary::*;
 pub use classic_connector::*;
 pub use config::*;
 pub use connector::*;
@@ -16,6 +20,8 @@ pub use edge::*;
 pub use grid::*;
 pub use piece::*;
 pub use seed::*;
+pub use masking::*;
+pub use shapes::*;
 pub use svg_export::*;
 
 use serde::{Deserialize, Serialize};
