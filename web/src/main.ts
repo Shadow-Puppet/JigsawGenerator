@@ -1,50 +1,150 @@
-import init, {
-  generate_edges_binary,
-  get_cached_svg,
-  init_panic_hook,
-} from "puzzle-wasm";
+import {
+  BUILD_SUPERSEDED,
+  requestBuild,
+  requestCachedSvg,
+  requestShapeUnitPath,
+} from "./worker-client";
 import "./style.css";
 
 function randomSeed(): string {
   return Math.random().toString(36).substring(2, 10);
 }
 
+/**
+ * Minimum CVT edge length (mm) below which a knob's neck would be
+ * thinner than ~3 mm — too fragile for laser-cut puzzle pieces.
+ * Derived from the connector's fixed ratios (knob 0.25 × cell, neck
+ * 0.25 × knob, so full neck opening = 0.125 × min_edge → need 24 mm
+ * for 3 mm opening). Keep in sync with `DEFAULT_MIN_KNOB_EDGE_LENGTH`
+ * in the Rust layer.
+ */
+const MIN_CELL_DIM_MM = 24;
+
+/**
+ * Linear dimension multiplier applied per-shape when computing the
+ * required puzzle area for a target piece count. Combines two effects:
+ *
+ * - **Hex-vs-square cell**: CVT cells are roughly hexagonal, and a
+ *   hex cell of the same area as an N×N square has edges shorter by
+ *   ~0.62×. To hit a target *edge* length, the equivalent square side
+ *   needs to be ~1.6× larger.
+ * - **Shape fill**: heart/star/other non-rectangular shapes fill only
+ *   ~50–60 % of their bounding rectangle, so the bbox needs to be
+ *   correspondingly bigger for the shape's interior to hold cells of
+ *   the required size.
+ *
+ * The values below include both effects. Tuned empirically against
+ * `node /tmp/wasm_test.mjs`-style knob-coverage runs.
+ */
+const SHAPE_DIM_MULTIPLIER: Record<string, number> = {
+  rectangle: 1.9,
+  "rounded-rect": 1.95,
+  circle: 2.15,
+  hexagon: 2.2,
+  triangle: 2.7,
+  diamond: 2.7,
+  arrow: 2.7,
+  heart: 3.0,
+  star: 3.0,
+};
+const DEFAULT_SHAPE_DIM_MULTIPLIER = 1.9;
+
+function shapeDimMultiplier(): number {
+  const key = borderShapeSelect.value || "rectangle";
+  return SHAPE_DIM_MULTIPLIER[key] ?? DEFAULT_SHAPE_DIM_MULTIPLIER;
+}
+
 // ─── DOM References ─────────────────────────────────────────
 
-let rowsInput: HTMLInputElement;
-let colsInput: HTMLInputElement;
 let widthInput: HTMLInputElement;
 let heightInput: HTMLInputElement;
 let unitSelect: HTMLSelectElement;
-let tabSlider: HTMLInputElement;
-let taperSlider: HTMLInputElement;
 let seedInput: HTMLInputElement;
 let pieceCount: HTMLElement;
 let errorDisplay: HTMLElement;
 
-let tabReadout: HTMLElement;
-let taperReadout: HTMLElement;
-let tabRandomize: HTMLInputElement;
-let tabMaxSlider: HTMLInputElement;
-let taperRandomize: HTMLInputElement;
-let taperMaxSlider: HTMLInputElement;
-let tabTrack: HTMLElement;
-let taperTrack: HTMLElement;
-
-let offsetSlider: HTMLInputElement;
-let offsetReadout: HTMLElement;
-
 let borderShapeSelect: HTMLSelectElement;
+let cellAlgorithmSelect: HTMLSelectElement;
+let poissonPolishSelect: HTMLSelectElement;
+let poissonPolishGroup: HTMLElement;
 
 let pieceTargetInput: HTMLInputElement;
 let pieceSizeWarning: HTMLElement;
-let gridLockCheckbox: HTMLInputElement;
 let dimsLockCheckbox: HTMLInputElement;
-let gridLocked = false;
 let dimsLocked = false;
+let knobsEnabledCheckbox: HTMLInputElement;
+let edgeKnobsEnabledCheckbox: HTMLInputElement;
+let seedsVisibleCheckbox: HTMLInputElement;
 
-let rulerWidth: HTMLElement;
-let rulerHeight: HTMLElement;
+let whimsyList: HTMLUListElement;
+let addWhimsyBtn: HTMLButtonElement;
+let shapePicker: HTMLDialogElement;
+
+// ─── Whimsy State ───────────────────────────────────────────
+
+/**
+ * One whimsy instance in the UI layer. Mapped to
+ * `WhimsyPlacement` JSON when sent to the WASM layer.
+ * `size` is a square bounding-box edge length in mm (width=height);
+ * the UI keeps whimsies isotropic to simplify scale controls.
+ */
+interface WhimsyInstance {
+  id: string;
+  shape: string;
+  centerX: number;
+  centerY: number;
+  size: number;
+  rotation: number;
+  subdivisions: number;
+}
+
+const whimsies: WhimsyInstance[] = [];
+let whimsyIdCounter = 0;
+
+/**
+ * Shape-name → unit-box (1 × 1) command-prefixed path. Populated on
+ * demand when a whimsy of that shape is first rendered. Shapes are
+ * deterministic and dimension-independent (their rounded-corner radius
+ * scales with `min(w, h)`), so caching the unit path and applying a
+ * per-whimsy affine transform in the overlay renderer produces the same
+ * pixels as re-building at the target size.
+ */
+const shapeUnitPathCache = new Map<string, Float64Array>();
+const shapeUnitPathPending = new Set<string>();
+
+/**
+ * Synchronous accessor for shape unit paths used during canvas
+ * rendering. The worker delivers paths asynchronously, so this
+ * returns `undefined` on a cache miss and kicks off an async fetch;
+ * when the fetch resolves, the path is cached and a re-render is
+ * scheduled. The caller (whimsy ghost overlay) just skips drawing
+ * the shape on miss — at most one frame of "shape not yet visible"
+ * after the user adds a new whimsy type, which is imperceptible.
+ */
+function getShapeUnitPath(shape: string): Float64Array | undefined {
+  const cached = shapeUnitPathCache.get(shape);
+  if (cached !== undefined) return cached;
+  if (!shapeUnitPathPending.has(shape)) {
+    shapeUnitPathPending.add(shape);
+    requestShapeUnitPath(shape)
+      .then((path) => {
+        shapeUnitPathCache.set(shape, path);
+        shapeUnitPathPending.delete(shape);
+        // Trigger a re-render so the newly-fetched shape appears.
+        scheduleTransform();
+      })
+      .catch((err) => {
+        shapeUnitPathPending.delete(shape);
+        console.warn(`[shape '${shape}'] fetch failed:`, err);
+      });
+  }
+  return undefined;
+}
+
+let rulerHCanvas: HTMLCanvasElement;
+let rulerVCanvas: HTMLCanvasElement;
+let rulerHCtx: CanvasRenderingContext2D | null = null;
+let rulerVCtx: CanvasRenderingContext2D | null = null;
 let svgViewport: HTMLElement;
 let zoomLevelDisplay: HTMLElement;
 let zoomInBtn: HTMLElement;
@@ -56,11 +156,69 @@ let zoomResetBtn: HTMLElement;
 let zoomLevel = 1;
 let panX = 0;
 let panY = 0;
-let isPanning = false;
-let panStartX = 0;
-let panStartY = 0;
 
 let rafPending = false;
+
+// ─── Canvas Interaction State ───────────────────────────────
+
+/**
+ * Mutually-exclusive interaction modes for mouse/touch drags on the
+ * puzzle canvas. One active mode at a time; `mousedown` picks a mode
+ * based on what's under the cursor, `mousemove` updates geometry, and
+ * `mouseup` returns to `idle` (and triggers a CVT regen if the
+ * interaction was a whimsy manipulation).
+ */
+type CornerDir = "tl" | "tr" | "br" | "bl";
+type InteractionMode =
+  | { kind: "idle" }
+  | { kind: "panning"; startX: number; startY: number }
+  | {
+      kind: "dragging-whimsy";
+      id: string;
+      offsetX: number;
+      offsetY: number;
+      // Original whimsy center at mousedown — used to gate regen-on-
+      // release until the user has actually moved the whimsy past
+      // `DRAG_REGEN_THRESHOLD_MM`. Without this, every click-without-
+      // drag would regen the layout on mouseup.
+      startCenterX: number;
+      startCenterY: number;
+      // Latched once the threshold is crossed; mouseup regens iff true.
+      committed: boolean;
+    }
+  | {
+      kind: "scaling-whimsy";
+      id: string;
+      corner: CornerDir;
+      initialSize: number;
+      initialDist: number;
+      // Same gating logic as drag — a tiny corner-wiggle shouldn't
+      // trigger a full regen.
+      committed: boolean;
+    }
+  | {
+      kind: "rotating-whimsy";
+      id: string;
+      initialRotation: number;
+      initialAngleDeg: number;
+      committed: boolean;
+    };
+
+/// Minimum displacement (mm) before a whimsy drag triggers a layout
+/// regen on mouseup. The user can click on a whimsy and release without
+/// dragging — nothing about the puzzle has actually changed, so the
+/// canonical layout should stay on screen unchanged.
+const DRAG_REGEN_THRESHOLD_MM = 1.5;
+/// Same idea for scale: minimum size delta (relative) before regen.
+const SCALE_REGEN_THRESHOLD_RATIO = 0.05;
+/// Same for rotation: minimum angle delta (deg) before regen.
+const ROTATE_REGEN_THRESHOLD_DEG = 2.0;
+
+let interaction: InteractionMode = { kind: "idle" };
+let selectedWhimsyId: string | null = null;
+
+const HANDLE_HIT_RADIUS_PX = 10;
+const HANDLE_SIZE_PX = 8;
 
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 20;
@@ -72,118 +230,564 @@ let canvas: HTMLCanvasElement | null = null;
 let ctx: CanvasRenderingContext2D | null = null;
 let edgesData: Float64Array | null = null;
 let borderData: Float64Array | null = null;
+let centersData: Float64Array | null = null;
+let anchorsData: Float64Array | null = null;
+// Cached Path2D objects built once per puzzle generation. Re-stroking
+// a Path2D on pan/zoom is O(1) on the JS side regardless of how many
+// curves are inside — vs. re-walking the binary command stream every
+// frame, which is O(curves). At 5k pieces ≈ 75k Béziers, this turns
+// pan/zoom from chunky into instant.
+let edgesPath2D: Path2D | null = null;
+let borderPath2D: Path2D | null = null;
 let puzzleWidth = 0;
 let puzzleHeight = 0;
-const EDGE_STRIDE = 36;
 
 // ─── Config Builder ─────────────────────────────────────────
 
+/**
+ * Toggle the Poisson polish dropdown's visibility based on the
+ * current algorithm choice. Polish is meaningless for CVT (which has
+ * its own fixed Lloyd iteration count), so hide it there.
+ */
+function syncPoissonPolishVisibility(): void {
+  if (!poissonPolishGroup || !cellAlgorithmSelect) return;
+  const isPoisson = cellAlgorithmSelect.value === "poisson";
+  poissonPolishGroup.hidden = !isPoisson;
+}
+
 function buildConfig(): object {
-  const tabConfig: Record<string, unknown> = {
-    size_pct: parseFloat(tabSlider.value),
-    taper: 0.57 + parseFloat(taperSlider.value) * 0.75,
-  };
-  if (tabRandomize.checked) {
-    tabConfig.size_pct_max = parseFloat(tabMaxSlider.value);
-  }
-  if (taperRandomize.checked) {
-    tabConfig.taper_max = 0.57 + parseFloat(taperMaxSlider.value) * 0.75;
-  }
-  tabConfig.offset = parseFloat(offsetSlider.value);
   const config: Record<string, unknown> = {
-    rows: parseInt(rowsInput.value, 10),
-    cols: parseInt(colsInput.value, 10),
+    piece_count: parseInt(pieceTargetInput.value, 10) || 48,
     width: parseFloat(widthInput.value),
     height: parseFloat(heightInput.value),
     unit: unitSelect.value,
-    tab: tabConfig,
     seed: seedInput.value,
   };
   const borderVal = borderShapeSelect.value;
   if (borderVal) {
     config.border_shape = borderVal;
   }
+  // Cell-generation algorithm. Omitted from the JSON when set to the
+  // default ("cvt") so existing URLs keep producing identical output.
+  const algoVal = cellAlgorithmSelect?.value;
+  if (algoVal && algoVal !== "cvt") {
+    config.cell_algorithm = algoVal;
+  }
+  // Poisson polish count: only meaningful when algorithm is poisson.
+  // Always include in the config when poisson is selected so the
+  // backend default doesn't override the user's choice.
+  if (algoVal === "poisson" && poissonPolishSelect) {
+    const polish = parseInt(poissonPolishSelect.value, 10);
+    if (!Number.isNaN(polish)) {
+      config.poisson_polish_iterations = polish;
+    }
+  }
+  if (knobsEnabledCheckbox && !knobsEnabledCheckbox.checked) {
+    config.disable_knobs = true;
+  }
+  if (edgeKnobsEnabledCheckbox && edgeKnobsEnabledCheckbox.checked) {
+    config.knob_outer_boundary = true;
+  }
+  if (whimsies.length > 0) {
+    config.whimsies = whimsies.map((w) => ({
+      shape: w.shape,
+      center_x: w.centerX,
+      center_y: w.centerY,
+      width: w.size,
+      height: w.size,
+      rotation: w.rotation,
+      subdivisions: w.subdivisions,
+    }));
+  }
   return config;
 }
 
+// ─── Whimsy Helpers ─────────────────────────────────────────
+
+/**
+ * Default size for a newly-added whimsy, in mm. Aim for a shape large
+ * enough to be noticeably bigger than a single CVT piece but small
+ * enough to leave breathing room inside the border.
+ */
+function defaultWhimsySize(): number {
+  const w = parseFloat(widthInput.value) || 100;
+  const h = parseFloat(heightInput.value) || 100;
+  const pc = parseInt(pieceTargetInput.value, 10) || 48;
+  const avgPieceDim = Math.sqrt((w * h) / pc);
+  const short = Math.min(w, h);
+  // 2× a single piece dim floor; 30 % of short side ceiling;
+  // 20 % of short side is the nominal target.
+  return Math.min(short * 0.3, Math.max(2 * avgPieceDim, short * 0.2));
+}
+
+function defaultWhimsyCenter(): { x: number; y: number } {
+  const w = parseFloat(widthInput.value) || 0;
+  const h = parseFloat(heightInput.value) || 0;
+  return { x: w / 2, y: h / 2 };
+}
+
+/**
+ * Minimum gap (mm) between any two whimsy outlines (their actual
+ * shape geometry, not bbox), and between a whimsy outline and the
+ * puzzle's outer rectangle. Prevents the CVT pipeline from being
+ * given a configuration where two whimsy holes (or a whimsy and the
+ * border) carve the puzzle interior into a thin strip — which
+ * produces slivers and pinches the anchor seed placements.
+ */
+const WHIMSY_CLEARANCE_MM = 1.25;
+
+/** Cubic-bezier subdivision count when flattening a whimsy outline. */
+const POLY_FLATTEN_STEPS = 8;
+
+/**
+ * Flatten a whimsy's cached unit-box path (`getShapeUnitPath`) to a
+ * world-space polygon — its `shape × size × rotation × position`
+ * outline as a list of (x, y) vertices. Cubic-bezier segments are
+ * subdivided into `POLY_FLATTEN_STEPS` linear pieces.
+ *
+ * The transform mirrors the one applied in `drawSelectionOverlay`:
+ * `translate(centerX, centerY) · rotate(rotation) · scale(size) · translate(-0.5, -0.5)`.
+ */
+function whimsyPolygon(w: WhimsyInstance): { x: number; y: number }[] {
+  const unitPath = getShapeUnitPath(w.shape);
+  if (unitPath === undefined || unitPath.length === 0) return [];
+
+  const rad = (w.rotation * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  const transform = (lx: number, ly: number) => {
+    const tx = (lx - 0.5) * w.size;
+    const ty = (ly - 0.5) * w.size;
+    return {
+      x: w.centerX + tx * cos - ty * sin,
+      y: w.centerY + tx * sin + ty * cos,
+    };
+  };
+
+  const out: { x: number; y: number }[] = [];
+  let i = 0;
+  let lastX = 0;
+  let lastY = 0;
+  while (i < unitPath.length) {
+    const cmd = unitPath[i];
+    if (cmd === 0 /* moveTo */) {
+      lastX = unitPath[i + 1];
+      lastY = unitPath[i + 2];
+      out.push(transform(lastX, lastY));
+      i += 3;
+    } else if (cmd === 1 /* lineTo */) {
+      lastX = unitPath[i + 1];
+      lastY = unitPath[i + 2];
+      out.push(transform(lastX, lastY));
+      i += 3;
+    } else if (cmd === 2 /* curveTo */) {
+      const c1x = unitPath[i + 1];
+      const c1y = unitPath[i + 2];
+      const c2x = unitPath[i + 3];
+      const c2y = unitPath[i + 4];
+      const ex = unitPath[i + 5];
+      const ey = unitPath[i + 6];
+      for (let k = 1; k <= POLY_FLATTEN_STEPS; k++) {
+        const t = k / POLY_FLATTEN_STEPS;
+        const u = 1 - t;
+        const px =
+          u * u * u * lastX +
+          3 * u * u * t * c1x +
+          3 * u * t * t * c2x +
+          t * t * t * ex;
+        const py =
+          u * u * u * lastY +
+          3 * u * u * t * c1y +
+          3 * u * t * t * c2y +
+          t * t * t * ey;
+        out.push(transform(px, py));
+      }
+      lastX = ex;
+      lastY = ey;
+      i += 7;
+    } else if (cmd === 3 /* close */) {
+      i += 1;
+    } else {
+      i += 1;
+    }
+  }
+  return out;
+}
+
+/** Distance from point `(px, py)` to segment `(ax,ay)–(bx,by)`. */
+function pointSegmentDistance(
+  px: number,
+  py: number,
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+): number {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const len2 = dx * dx + dy * dy;
+  let t = len2 > 0 ? ((px - ax) * dx + (py - ay) * dy) / len2 : 0;
+  if (t < 0) t = 0;
+  else if (t > 1) t = 1;
+  const cx = ax + t * dx;
+  const cy = ay + t * dy;
+  return Math.hypot(px - cx, py - cy);
+}
+
+/** Even-odd point-in-polygon test (treats `poly` as a closed loop). */
+function pointInPolygon(
+  px: number,
+  py: number,
+  poly: { x: number; y: number }[],
+): boolean {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const xi = poly[i].x;
+    const yi = poly[i].y;
+    const xj = poly[j].x;
+    const yj = poly[j].y;
+    const intersects =
+      yi > py !== yj > py &&
+      px < ((xj - xi) * (py - yi)) / (yj - yi) + xi;
+    if (intersects) inside = !inside;
+  }
+  return inside;
+}
+
+/**
+ * Minimum distance between two closed polygons. Returns 0 if they
+ * overlap (any vertex of one inside the other). Otherwise: minimum of
+ * (each A-vertex to each B-segment) and (each B-vertex to each
+ * A-segment). With 30-ish vertices per shape the whole thing is
+ * ~1800 operations — fine for per-frame drag updates.
+ */
+function minPolyDistance(
+  a: { x: number; y: number }[],
+  b: { x: number; y: number }[],
+): number {
+  if (a.length === 0 || b.length === 0) return Infinity;
+  // Quick overlap test: any vertex of either polygon inside the other.
+  for (const p of a) if (pointInPolygon(p.x, p.y, b)) return 0;
+  for (const p of b) if (pointInPolygon(p.x, p.y, a)) return 0;
+
+  let best = Infinity;
+  for (const p of a) {
+    for (let j = 0; j < b.length; j++) {
+      const q1 = b[j];
+      const q2 = b[(j + 1) % b.length];
+      const d = pointSegmentDistance(p.x, p.y, q1.x, q1.y, q2.x, q2.y);
+      if (d < best) best = d;
+    }
+  }
+  for (const p of b) {
+    for (let j = 0; j < a.length; j++) {
+      const q1 = a[j];
+      const q2 = a[(j + 1) % a.length];
+      const d = pointSegmentDistance(p.x, p.y, q1.x, q1.y, q2.x, q2.y);
+      if (d < best) best = d;
+    }
+  }
+  return best;
+}
+
+/**
+ * Returns true if placing/updating `candidate` at its current
+ * position keeps it (a) at least `WHIMSY_CLEARANCE_MM` away from every
+ * other whimsy's outline and (b) at least `WHIMSY_CLEARANCE_MM` away
+ * from every side of the puzzle's outer rectangle. Both checks use
+ * the actual shape geometry (flattened), not the AABB.
+ */
+function whimsyPlacementValid(
+  candidate: WhimsyInstance,
+  others: WhimsyInstance[],
+): boolean {
+  const puzzleW = parseFloat(widthInput.value) || 0;
+  const puzzleH = parseFloat(heightInput.value) || 0;
+  if (puzzleW <= 0 || puzzleH <= 0) return true;
+
+  const candPoly = whimsyPolygon(candidate);
+  if (candPoly.length === 0) return true; // unknown shape — no check possible
+
+  // Edge clearance: every outline vertex must sit at least
+  // WHIMSY_CLEARANCE_MM inside each puzzle-rect side.
+  const inset = WHIMSY_CLEARANCE_MM;
+  for (const p of candPoly) {
+    if (
+      p.x < inset ||
+      p.y < inset ||
+      p.x > puzzleW - inset ||
+      p.y > puzzleH - inset
+    ) {
+      return false;
+    }
+  }
+  // Whimsy-to-whimsy clearance via shape geometry.
+  for (const other of others) {
+    if (other.id === candidate.id) continue;
+    const otherPoly = whimsyPolygon(other);
+    if (otherPoly.length === 0) continue;
+    if (minPolyDistance(candPoly, otherPoly) < WHIMSY_CLEARANCE_MM) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function addWhimsy(shape: string): void {
+  const size = defaultWhimsySize();
+  const { x, y } = defaultWhimsyCenter();
+  const candidate: WhimsyInstance = {
+    id: `w${whimsyIdCounter++}`,
+    shape,
+    centerX: x,
+    centerY: y,
+    size,
+    rotation: 0,
+    subdivisions: 0,
+  };
+
+  // If the default center conflicts with an existing whimsy or is
+  // too close to the edge, spiral outward through a few candidate
+  // positions. Falls back to the default position if nothing fits.
+  if (!whimsyPlacementValid(candidate, whimsies)) {
+    const offsets = [size, size * 1.5, size * 2.0, size * 2.5];
+    const angles = [0, 60, 120, 180, 240, 300, 30, 90, 150, 210, 270, 330];
+    let placed = false;
+    outer: for (const off of offsets) {
+      for (const angDeg of angles) {
+        const rad = (angDeg * Math.PI) / 180;
+        candidate.centerX = x + off * Math.cos(rad);
+        candidate.centerY = y + off * Math.sin(rad);
+        if (whimsyPlacementValid(candidate, whimsies)) {
+          placed = true;
+          break outer;
+        }
+      }
+    }
+    if (!placed) {
+      // Couldn't find a valid spot; restore default and let the user
+      // resize / drag manually.
+      candidate.centerX = x;
+      candidate.centerY = y;
+    }
+  }
+
+  whimsies.push(candidate);
+  renderWhimsies();
+  scheduleGenerate();
+}
+
+function removeWhimsy(id: string): void {
+  const idx = whimsies.findIndex((w) => w.id === id);
+  if (idx >= 0) {
+    whimsies.splice(idx, 1);
+    renderWhimsies();
+    scheduleGenerate();
+  }
+}
+
+function renderWhimsies(): void {
+  whimsyList.innerHTML = "";
+  for (const w of whimsies) {
+    whimsyList.appendChild(buildWhimsyCard(w));
+  }
+}
+
+function buildWhimsyCard(w: WhimsyInstance): HTMLLIElement {
+  const short = Math.min(
+    parseFloat(widthInput.value) || 100,
+    parseFloat(heightInput.value) || 100,
+  );
+  const sizeMin = Math.max(10, Math.round(short * 0.05));
+  const sizeMax = Math.max(sizeMin + 1, Math.round(short * 0.6));
+
+  const li = document.createElement("li");
+  li.className = "whimsy-card";
+  li.dataset.id = w.id;
+  li.innerHTML = `
+    <div class="whimsy-card-header">
+      <span class="whimsy-name">${w.shape}</span>
+      <button type="button" class="whimsy-delete" title="Delete whimsy">&times;</button>
+    </div>
+    <div class="whimsy-control">
+      <label>Size</label>
+      <input type="range" class="whimsy-size" min="${sizeMin}" max="${sizeMax}" step="1" value="${Math.round(w.size)}"/>
+      <span class="value-readout">${Math.round(w.size)} mm</span>
+    </div>
+    <div class="whimsy-control">
+      <label>Rotation</label>
+      <input type="range" class="whimsy-rotation" min="0" max="360" step="1" value="${Math.round(w.rotation)}"/>
+      <span class="value-readout">${Math.round(w.rotation)}°</span>
+    </div>
+    <div class="whimsy-control">
+      <label>Subdivisions</label>
+      <input type="number" class="whimsy-subdivisions" min="0" max="40" step="1" value="${w.subdivisions}" title="0 = solid; 3+ = nested CVT"/>
+    </div>
+  `;
+
+  const sizeSlider = li.querySelector(".whimsy-size") as HTMLInputElement;
+  const sizeReadout = sizeSlider.nextElementSibling as HTMLElement;
+  sizeSlider.addEventListener("input", () => {
+    const next = parseFloat(sizeSlider.value);
+    const candidate: WhimsyInstance = { ...w, size: next };
+    if (whimsyPlacementValid(candidate, whimsies)) {
+      w.size = next;
+      sizeReadout.textContent = `${Math.round(w.size)} mm`;
+      scheduleGenerate();
+    } else {
+      // Snap the slider back to the last legal value.
+      sizeSlider.value = String(Math.round(w.size));
+    }
+  });
+
+  const rotSlider = li.querySelector(".whimsy-rotation") as HTMLInputElement;
+  const rotReadout = rotSlider.nextElementSibling as HTMLElement;
+  rotSlider.addEventListener("input", () => {
+    const next = parseFloat(rotSlider.value);
+    const candidate: WhimsyInstance = { ...w, rotation: next };
+    if (whimsyPlacementValid(candidate, whimsies)) {
+      w.rotation = next;
+      rotReadout.textContent = `${Math.round(w.rotation)}°`;
+      scheduleGenerate();
+    } else {
+      rotSlider.value = String(Math.round(w.rotation));
+    }
+  });
+
+  const subInput = li.querySelector(".whimsy-subdivisions") as HTMLInputElement;
+  subInput.addEventListener("input", () => {
+    const v = parseInt(subInput.value, 10);
+    // 1 and 2 can't form a valid nested CVT (voronoice needs ≥ 3
+    // seeds); treat them as 0 (solid whimsy) so the user sees a
+    // predictable fallback rather than a silent collapse.
+    w.subdivisions = isNaN(v) || v < 0 || v === 1 || v === 2 ? 0 : v;
+    scheduleGenerate();
+  });
+
+  const deleteBtn = li.querySelector(".whimsy-delete") as HTMLButtonElement;
+  deleteBtn.addEventListener("click", () => removeWhimsy(w.id));
+
+  return li;
+}
+
 // ─── URL Param Sync ──────────────────────────────────────────
+
+/** Round a floating value to one decimal place for compact URL encoding. */
+function fmtShort(n: number): string {
+  return String(Math.round(n * 10) / 10);
+}
 
 function loadFromURL(): boolean {
   const params = new URLSearchParams(window.location.search);
   if (params.size === 0) return false;
 
-  const rows = parseInt(params.get("rows") ?? "6", 10);
-  const cols = parseInt(params.get("cols") ?? "8", 10);
+  // Piece count: prefer `pc`, fall back to legacy `rows`·`cols` URLs.
+  let pc = parseInt(params.get("pc") ?? "", 10);
+  if (isNaN(pc)) {
+    const rows = parseInt(params.get("rows") ?? "", 10);
+    const cols = parseInt(params.get("cols") ?? "", 10);
+    pc = !isNaN(rows) && !isNaN(cols) ? rows * cols : 48;
+  }
   const w = parseFloat(params.get("w") ?? "297");
   const h = parseFloat(params.get("h") ?? "210");
   const unitParam = params.get("unit") ?? "mm";
   const unit = unitParam === "in" ? "Inches" : "Millimeters";
-  const tab = Math.max(0.15, Math.min(0.20, parseInt(params.get("tab") ?? "20", 10) / 100));
-  const taperUser = parseInt(params.get("taper") ?? "0", 10) / 100;
-  const taper = Math.max(0, Math.min(1, taperUser));
   const seed = params.get("seed") ?? "";
+  // Legacy URLs stored missing `border` for rectangle; treat as
+  // "rectangle" now that rectangle is an explicit option.
+  const border = params.get("border") ?? "rectangle";
 
-  rowsInput.value = String(rows);
-  colsInput.value = String(cols);
+  pieceTargetInput.value = String(pc);
   widthInput.value = String(w);
   heightInput.value = String(h);
   unitSelect.value = unit;
-  tabSlider.value = String(tab);
-  taperSlider.value = String(taper);
   seedInput.value = seed || randomSeed();
-
-  // Restore randomize state
-  if (params.get("tabr") === "1") {
-    tabRandomize.checked = true;
-    tabRandomize.closest('.pill-toggle')?.classList.add('active');
-    const tabMax = Math.max(0.15, Math.min(0.20, parseInt(params.get("tabmax") ?? "20", 10) / 100));
-    tabMaxSlider.value = String(tabMax);
-    tabMaxSlider.style.display = "";
+  borderShapeSelect.value = border || "rectangle";
+  // Cell-generation algorithm. Defaults to "cvt" so legacy URLs
+  // without `algo=` keep producing identical output.
+  cellAlgorithmSelect.value = params.get("algo") ?? "cvt";
+  // Poisson polish iterations. Defaults to 3 (matches backend
+  // default). Range clamped 0–10. Ignored when algo != poisson.
+  const polishStr = params.get("polish");
+  if (polishStr !== null) {
+    const polish = parseInt(polishStr, 10);
+    if (!Number.isNaN(polish)) {
+      poissonPolishSelect.value = String(Math.max(0, Math.min(10, polish)));
+    }
   }
-  if (params.get("taperr") === "1") {
-    taperRandomize.checked = true;
-    taperRandomize.closest('.pill-toggle')?.classList.add('active');
-    const taperMax = Math.max(0, Math.min(1, parseInt(params.get("tapermax") ?? "0", 10) / 100));
-    taperMaxSlider.value = String(taperMax);
-    taperMaxSlider.style.display = "";
+  syncPoissonPolishVisibility();
+
+  // Whimsies: `wh=heart:200,150,60,0,0;star:100,80,40,45,3`
+  // Each whimsy is `shape:cx,cy,size,rotation,subdivisions`,
+  // semicolon-separated. Malformed entries are skipped.
+  whimsies.length = 0;
+  const whParam = params.get("wh");
+  if (whParam) {
+    for (const chunk of whParam.split(";")) {
+      if (!chunk) continue;
+      const colonIdx = chunk.indexOf(":");
+      if (colonIdx < 0) continue;
+      const shape = chunk.slice(0, colonIdx);
+      const fields = chunk.slice(colonIdx + 1).split(",");
+      if (fields.length < 5) continue;
+      const cx = parseFloat(fields[0]);
+      const cy = parseFloat(fields[1]);
+      const size = parseFloat(fields[2]);
+      const rot = parseFloat(fields[3]);
+      const subs = parseInt(fields[4], 10);
+      if ([cx, cy, size, rot].some((v) => isNaN(v)) || isNaN(subs)) continue;
+      whimsies.push({
+        id: `w${whimsyIdCounter++}`,
+        shape,
+        centerX: cx,
+        centerY: cy,
+        size,
+        rotation: rot,
+        subdivisions: subs,
+      });
+    }
   }
-
-  // Restore offset state (will be clamped by updateOffsetMax after load)
-  const offsetVal = parseInt(params.get("off") ?? "0", 10) / 100;
-  const offset = Math.max(0, Math.min(0.20, offsetVal));
-  offsetSlider.value = String(offset);
-
-  // Restore border shape
-  const border = params.get("border") ?? "";
-  borderShapeSelect.value = border;
 
   return true;
 }
 
 function updateURL(): void {
   const config = buildConfig() as Record<string, unknown>;
-  const tabObj = config.tab as Record<string, number>;
   const params = new URLSearchParams();
-  params.set("rows", String(config.rows));
-  params.set("cols", String(config.cols));
+  params.set("pc", String(config.piece_count));
   params.set("w", String(config.width));
   params.set("h", String(config.height));
   params.set("unit", config.unit === "Inches" ? "in" : "mm");
-  params.set("tab", String(Math.round(tabObj.size_pct * 100)));
-  params.set("taper", String(Math.round(parseFloat(taperSlider.value) * 100)));
   params.set("seed", String(config.seed));
-  if (tabRandomize.checked) {
-    params.set("tabr", "1");
-    params.set("tabmax", String(Math.round(parseFloat(tabMaxSlider.value) * 100)));
-  }
-  if (taperRandomize.checked) {
-    params.set("taperr", "1");
-    params.set("tapermax", String(Math.round(parseFloat(taperMaxSlider.value) * 100)));
-  }
-  params.set("off", String(Math.round(parseFloat(offsetSlider.value) * 100)));
   const borderVal = borderShapeSelect.value;
-  if (borderVal) {
+  if (borderVal && borderVal !== "rectangle") {
     params.set("border", borderVal);
+  }
+  // Cell algorithm. Omitted when default ("cvt") so existing URLs
+  // stay byte-identical.
+  const algoVal = cellAlgorithmSelect.value;
+  if (algoVal && algoVal !== "cvt") {
+    params.set("algo", algoVal);
+  }
+  // Poisson polish count. Only included when (a) algorithm is
+  // poisson and (b) the value isn't the default 3 — keeps URLs
+  // short for the common case.
+  if (algoVal === "poisson") {
+    const polish = poissonPolishSelect.value;
+    if (polish && polish !== "3") {
+      params.set("polish", polish);
+    }
+  }
+  if (whimsies.length > 0) {
+    const encoded = whimsies
+      .map(
+        (w) =>
+          `${w.shape}:${fmtShort(w.centerX)},${fmtShort(w.centerY)},${fmtShort(
+            w.size,
+          )},${Math.round(w.rotation)},${w.subdivisions}`,
+      )
+      .join(";");
+    params.set("wh", encoded);
   }
   history.replaceState(null, "", "?" + params.toString());
 }
@@ -196,159 +800,316 @@ function scheduleURLUpdate(): void {
   urlTimeout = setTimeout(updateURL, 300);
 }
 
-// ─── Dynamic Tab Size Clamping ───────────────────────────────
-
-function updateTabMax(): void {
-  const rows = parseInt(rowsInput.value, 10) || 1;
-  const cols = parseInt(colsInput.value, 10) || 1;
-  const w = parseFloat(widthInput.value) || 1;
-  const h = parseFloat(heightInput.value) || 1;
-  const cellW = w / cols;
-  const cellH = h / rows;
-  const maxH = cellH / (2.0 * cellW * 1.2);
-  const maxV = cellW / (2.0 * cellH * 1.2);
-  const maxApproach = 1.0 / (2.0 * 1.2);
-  const safeMax = Math.min(maxH, maxV, maxApproach) * 0.9;
-  const tabMax = Math.min(safeMax, 0.20);
-
-  tabSlider.max = String(tabMax);
-  tabMaxSlider.max = String(tabMax);
-  if (parseFloat(tabSlider.value) > tabMax) tabSlider.value = String(tabMax);
-  if (parseFloat(tabMaxSlider.value) > tabMax) tabMaxSlider.value = String(tabMax);
-  updateOffsetMax();
-}
-
-// ─── Dynamic Offset Clamping ─────────────────────────────────
-// Max offset scales inversely with tab size: 0.35 - effective_tab_size.
-// At 25% tab → max 0.10, at 20% → 0.15, at 15% → 0.20.
-
-function updateOffsetMax(): void {
-  const tabSize = tabRandomize.checked
-    ? parseFloat(tabMaxSlider.value)
-    : parseFloat(tabSlider.value);
-  const maxOffset = Math.round((0.35 - tabSize) * 100) / 100;
-  offsetSlider.max = String(maxOffset);
-  if (parseFloat(offsetSlider.value) > maxOffset) {
-    offsetSlider.value = String(maxOffset);
-  }
-}
-
-// ─── Ruler Update ───────────────────────────────────────────
-
-function updateRuler(): void {
-  const w = parseFloat(widthInput.value);
-  const h = parseFloat(heightInput.value);
-  const unit = unitSelect.value === "Inches" ? "in" : "mm";
-  const fmt = unit === "mm" ? 0 : 2;
-  rulerWidth.textContent = `${w.toFixed(fmt)} ${unit}`;
-  rulerHeight.textContent = `${h.toFixed(fmt)} ${unit}`;
-}
-
 // ─── Canvas Resize ───────────────────────────────────────────
+
+function resizeCanvasToViewport(
+  el: HTMLCanvasElement,
+  ctx2d: CanvasRenderingContext2D | null,
+  cssWidth: number,
+  cssHeight: number,
+): void {
+  const dpr = window.devicePixelRatio || 1;
+  el.width = Math.max(1, Math.round(cssWidth * dpr));
+  el.height = Math.max(1, Math.round(cssHeight * dpr));
+  el.style.width = cssWidth + "px";
+  el.style.height = cssHeight + "px";
+  if (ctx2d) ctx2d.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
 
 function resizeCanvas(): void {
   if (!canvas || !ctx) return;
-  const dpr = window.devicePixelRatio || 1;
   const rect = svgViewport.getBoundingClientRect();
-  canvas.width = rect.width * dpr;
-  canvas.height = rect.height * dpr;
-  canvas.style.width = rect.width + "px";
-  canvas.style.height = rect.height + "px";
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  resizeCanvasToViewport(canvas, ctx, rect.width, rect.height);
+  // Match rulers to the viewport so ticks line up with the puzzle canvas.
+  if (rulerHCanvas && rulerHCtx) {
+    const r = rulerHCanvas.getBoundingClientRect();
+    resizeCanvasToViewport(rulerHCanvas, rulerHCtx, r.width, r.height);
+  }
+  if (rulerVCanvas && rulerVCtx) {
+    const r = rulerVCanvas.getBoundingClientRect();
+    resizeCanvasToViewport(rulerVCanvas, rulerVCtx, r.width, r.height);
+  }
+}
+
+// ─── Rulers ─────────────────────────────────────────────────
+
+/**
+ * Pick a "nice" major-tick step (mm) such that the tick spacing on
+ * screen is at least `minPxBetweenMajorTicks`. Steps are a 1-2-5 ladder
+ * in mm — so at tight zooms we get 1 mm major ticks, loose zooms step
+ * up to 2, 5, 10, 20, 50, 100, 200, 500, 1000 mm. In inch mode the
+ * ladder adapts to 1-2-5 inch-equivalents.
+ */
+function pickMajorStep(scale: number, minPxBetweenMajorTicks: number): number {
+  const inches = unitSelect.value === "Inches";
+  const steps_mm = inches
+    // 1/8 in = 3.175, 1/4 = 6.35, 1/2 = 12.7, 1 in = 25.4, etc.
+    ? [3.175, 6.35, 12.7, 25.4, 50.8, 127.0, 254.0, 508.0, 1270.0, 2540.0]
+    : [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000];
+  for (const s of steps_mm) {
+    if (s * scale >= minPxBetweenMajorTicks) return s;
+  }
+  return steps_mm[steps_mm.length - 1];
+}
+
+/**
+ * Format a puzzle-space coordinate (in mm) for display on the ruler,
+ * in the currently selected display unit.
+ */
+function formatRulerLabel(mm: number): string {
+  if (unitSelect.value === "Inches") {
+    const inches = mm / 25.4;
+    const rounded = Math.round(inches * 100) / 100;
+    return Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(2);
+  }
+  const rounded = Math.round(mm * 100) / 100;
+  return Number.isInteger(rounded) ? rounded.toFixed(0) : String(rounded);
+}
+
+/**
+ * Draw ticked rulers on the horizontal + vertical canvases that sit
+ * along the top and left of the puzzle viewport. The rulers use the
+ * same `scale` and `panX`/`panY` as the puzzle canvas, so ticks line
+ * up with the underlying puzzle geometry at any zoom/pan.
+ */
+function drawRulers(scale: number): void {
+  if (!rulerHCtx || !rulerVCtx) return;
+
+  const tickShort = 4;
+  const tickMid = 8;
+  const tickLong = 12;
+  const labelFont = "10px system-ui, -apple-system, sans-serif";
+  const tickColor = "#999";
+  const labelColor = "#555";
+
+  // Horizontal ruler.
+  {
+    const c = rulerHCtx;
+    const w = rulerHCanvas.clientWidth;
+    const h = rulerHCanvas.clientHeight;
+    c.clearRect(0, 0, w, h);
+    c.fillStyle = labelColor;
+    c.strokeStyle = tickColor;
+    c.lineWidth = 1;
+    c.font = labelFont;
+    c.textBaseline = "top";
+    c.textAlign = "center";
+
+    const majorStep = pickMajorStep(scale, 50);
+    const minorStep = majorStep / 5;
+    const leftMm = -panX / scale;
+    const rightMm = leftMm + w / scale;
+
+    // Minor ticks
+    const firstMinor = Math.ceil(leftMm / minorStep) * minorStep;
+    c.beginPath();
+    for (let mm = firstMinor; mm <= rightMm + 1e-6; mm += minorStep) {
+      const x = Math.round(panX + mm * scale) + 0.5;
+      // Skip if it coincides with a major tick (drawn below).
+      const nearMajor =
+        Math.abs(mm / majorStep - Math.round(mm / majorStep)) < 1e-6;
+      if (nearMajor) continue;
+      c.moveTo(x, h);
+      c.lineTo(x, h - tickShort);
+    }
+    c.stroke();
+
+    // Major ticks + labels
+    const firstMajor = Math.ceil(leftMm / majorStep) * majorStep;
+    c.beginPath();
+    for (let mm = firstMajor; mm <= rightMm + 1e-6; mm += majorStep) {
+      const x = Math.round(panX + mm * scale) + 0.5;
+      c.moveTo(x, h);
+      c.lineTo(x, h - tickLong);
+    }
+    c.stroke();
+    for (let mm = firstMajor; mm <= rightMm + 1e-6; mm += majorStep) {
+      const x = Math.round(panX + mm * scale);
+      c.fillText(formatRulerLabel(mm), x, 2);
+    }
+
+    // Mid subdivisions (thicker than minor, thinner than major)
+    c.strokeStyle = tickColor;
+    c.beginPath();
+    for (let mm = firstMinor; mm <= rightMm + 1e-6; mm += minorStep) {
+      // Mid-tick at halfway between major ticks (2.5 minor from major).
+      const halfRatio = mm / (majorStep / 2);
+      const nearHalf = Math.abs(halfRatio - Math.round(halfRatio)) < 1e-6;
+      const nearMajor =
+        Math.abs(mm / majorStep - Math.round(mm / majorStep)) < 1e-6;
+      if (nearHalf && !nearMajor) {
+        const x = Math.round(panX + mm * scale) + 0.5;
+        c.moveTo(x, h);
+        c.lineTo(x, h - tickMid);
+      }
+    }
+    c.stroke();
+  }
+
+  // Vertical ruler (same logic, rotated).
+  {
+    const c = rulerVCtx;
+    const w = rulerVCanvas.clientWidth;
+    const h = rulerVCanvas.clientHeight;
+    c.clearRect(0, 0, w, h);
+    c.fillStyle = labelColor;
+    c.strokeStyle = tickColor;
+    c.lineWidth = 1;
+    c.font = labelFont;
+    c.textBaseline = "middle";
+    c.textAlign = "center";
+
+    const majorStep = pickMajorStep(scale, 50);
+    const minorStep = majorStep / 5;
+    const topMm = -panY / scale;
+    const bottomMm = topMm + h / scale;
+
+    const firstMinor = Math.ceil(topMm / minorStep) * minorStep;
+    c.beginPath();
+    for (let mm = firstMinor; mm <= bottomMm + 1e-6; mm += minorStep) {
+      const y = Math.round(panY + mm * scale) + 0.5;
+      const nearMajor =
+        Math.abs(mm / majorStep - Math.round(mm / majorStep)) < 1e-6;
+      if (nearMajor) continue;
+      c.moveTo(w, y);
+      c.lineTo(w - tickShort, y);
+    }
+    c.stroke();
+
+    const firstMajor = Math.ceil(topMm / majorStep) * majorStep;
+    c.beginPath();
+    for (let mm = firstMajor; mm <= bottomMm + 1e-6; mm += majorStep) {
+      const y = Math.round(panY + mm * scale) + 0.5;
+      c.moveTo(w, y);
+      c.lineTo(w - tickLong, y);
+    }
+    c.stroke();
+    // Labels: rotated 90° so they run along the ruler.
+    for (let mm = firstMajor; mm <= bottomMm + 1e-6; mm += majorStep) {
+      const y = Math.round(panY + mm * scale);
+      c.save();
+      c.translate(w / 2 - 2, y);
+      c.rotate(-Math.PI / 2);
+      c.fillText(formatRulerLabel(mm), 0, 0);
+      c.restore();
+    }
+
+    c.beginPath();
+    for (let mm = firstMinor; mm <= bottomMm + 1e-6; mm += minorStep) {
+      const halfRatio = mm / (majorStep / 2);
+      const nearHalf = Math.abs(halfRatio - Math.round(halfRatio)) < 1e-6;
+      const nearMajor =
+        Math.abs(mm / majorStep - Math.round(mm / majorStep)) < 1e-6;
+      if (nearHalf && !nearMajor) {
+        const y = Math.round(panY + mm * scale) + 0.5;
+        c.moveTo(w, y);
+        c.lineTo(w - tickMid, y);
+      }
+    }
+    c.stroke();
+  }
 }
 
 // ─── Canvas Drawing ──────────────────────────────────────────
 
-function drawBorder(c: CanvasRenderingContext2D): void {
-  if (!borderData) return;
-  c.beginPath();
+/**
+ * Parse a command-prefixed Float64Array and issue canvas drawing calls.
+ * Format (matches the Rust CMD_ constants in binary_export.rs):
+ *   0 (moveTo):   +2 floats (x, y)
+ *   1 (lineTo):   +2 floats (x, y)
+ *   2 (curveTo):  +6 floats (cp1x, cp1y, cp2x, cp2y, x, y)
+ *   3 (closePath): +0 floats
+ * Caller is responsible for beginPath/stroke around this.
+ */
+/**
+ * Walk the command-prefixed binary stream directly into a context.
+ * Used for one-off paths drawn under per-frame transforms (e.g. the
+ * whimsy ghost overlay) where caching as a Path2D doesn't help. For
+ * static-per-generation paths (edges, border) prefer `binaryToPath2D`
+ * + `ctx.stroke(path)`, which avoids re-walking the stream every frame.
+ */
+function playCommands(c: CanvasRenderingContext2D, data: Float64Array): void {
   let i = 0;
-  while (i < borderData.length) {
-    const cmd = borderData[i];
+  const len = data.length;
+  while (i < len) {
+    const cmd = data[i];
     if (cmd === 0) {
-      // moveTo
-      c.moveTo(borderData[i + 1], borderData[i + 2]);
+      c.moveTo(data[i + 1], data[i + 2]);
       i += 3;
     } else if (cmd === 1) {
-      // lineTo
-      c.lineTo(borderData[i + 1], borderData[i + 2]);
+      c.lineTo(data[i + 1], data[i + 2]);
       i += 3;
     } else if (cmd === 2) {
-      // curveTo
       c.bezierCurveTo(
-        borderData[i + 1],
-        borderData[i + 2],
-        borderData[i + 3],
-        borderData[i + 4],
-        borderData[i + 5],
-        borderData[i + 6],
+        data[i + 1],
+        data[i + 2],
+        data[i + 3],
+        data[i + 4],
+        data[i + 5],
+        data[i + 6],
       );
       i += 7;
     } else if (cmd === 3) {
-      // closePath
       c.closePath();
       i += 1;
     } else {
       i += 1;
     }
   }
-  c.stroke();
 }
 
-function drawVisibleEdges(
-  c: CanvasRenderingContext2D,
-  vpL: number,
-  vpT: number,
-  vpR: number,
-  vpB: number,
-): void {
-  if (!edgesData) return;
-  const data = edgesData;
+/**
+ * Walk the command-prefixed binary stream into a fresh `Path2D`.
+ * Commands match `crates/puzzle-core/src/binary_export.rs`:
+ *   0 = moveTo (x, y)
+ *   1 = lineTo (x, y)
+ *   2 = bezierCurveTo (cp1x, cp1y, cp2x, cp2y, x, y)
+ *   3 = closePath
+ */
+function binaryToPath2D(data: Float64Array): Path2D {
+  const path = new Path2D();
+  let i = 0;
   const len = data.length;
-
-  c.beginPath();
-
-  for (let i = 0; i < len; i += EDGE_STRIDE) {
-    // Read edge bounding box from header (start/end points)
-    const sx = data[i],
-      sy = data[i + 1],
-      ex = data[i + 2],
-      ey = data[i + 3];
-
-    // Quick AABB cull: edge bounding box vs viewport
-    const edgeLen = Math.abs(ex - sx) + Math.abs(ey - sy);
-    const margin = edgeLen * 0.35;
-    const minX = Math.min(sx, ex) - margin;
-    const maxX = Math.max(sx, ex) + margin;
-    const minY = Math.min(sy, ey) - margin;
-    const maxY = Math.max(sy, ey) + margin;
-
-    if (maxX < vpL || minX > vpR || maxY < vpT || minY > vpB) {
-      continue;
-    }
-
-    // MoveTo (first curve's p0)
-    c.moveTo(data[i + 4], data[i + 5]);
-
-    // 5 curves, 6 floats each, starting at offset 6
-    for (let ci = 0; ci < 5; ci++) {
-      const base = i + 6 + ci * 6;
-      c.bezierCurveTo(
-        data[base],
-        data[base + 1],
-        data[base + 2],
-        data[base + 3],
-        data[base + 4],
-        data[base + 5],
+  while (i < len) {
+    const cmd = data[i];
+    if (cmd === 0) {
+      path.moveTo(data[i + 1], data[i + 2]);
+      i += 3;
+    } else if (cmd === 1) {
+      path.lineTo(data[i + 1], data[i + 2]);
+      i += 3;
+    } else if (cmd === 2) {
+      path.bezierCurveTo(
+        data[i + 1],
+        data[i + 2],
+        data[i + 3],
+        data[i + 4],
+        data[i + 5],
+        data[i + 6],
       );
+      i += 7;
+    } else if (cmd === 3) {
+      path.closePath();
+      i += 1;
+    } else {
+      i += 1;
     }
   }
+  return path;
+}
 
-  c.stroke();
+function drawBorder(c: CanvasRenderingContext2D): void {
+  if (!borderPath2D) return;
+  c.stroke(borderPath2D);
+}
+
+function drawEdges(c: CanvasRenderingContext2D): void {
+  if (!edgesPath2D) return;
+  c.stroke(edgesPath2D);
 }
 
 function drawPuzzle(): void {
-  if (!ctx || !edgesData || !borderData) return;
+  if (!ctx || !edgesPath2D || !borderPath2D) return;
 
   const vpW = svgViewport.clientWidth;
   const vpH = svgViewport.clientHeight;
@@ -359,12 +1120,6 @@ function drawPuzzle(): void {
   // Compute transform: puzzle mm coords -> screen pixels
   const baseScale = vpW / puzzleWidth;
   const scale = baseScale * zoomLevel;
-
-  // Viewport bounds in puzzle mm coordinates (for culling)
-  const vpLeft = -panX / scale;
-  const vpTop = -panY / scale;
-  const vpRight = vpLeft + vpW / scale;
-  const vpBottom = vpTop + vpH / scale;
 
   // Set up canvas transform
   ctx.save();
@@ -377,13 +1132,271 @@ function drawPuzzle(): void {
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
 
-  // Draw border (always visible, small data)
   drawBorder(ctx);
-
-  // Draw internal edges with viewport culling
-  drawVisibleEdges(ctx, vpLeft, vpTop, vpRight, vpBottom);
+  drawEdges(ctx);
 
   ctx.restore();
+
+  drawSeedDots(ctx);
+  drawSelectionOverlay(ctx);
+  drawRulers(scale);
+}
+
+/**
+ * Debug overlay: plot current piece centers (solid red dots) and the
+ * initial anchor positions the CVT started from (hollow red rings).
+ * Comparing the two shows how far Lloyd relaxation moved each seed.
+ */
+function drawSeedDots(c: CanvasRenderingContext2D): void {
+  if (!seedsVisibleCheckbox || !seedsVisibleCheckbox.checked) return;
+  const scale = currentScale();
+  const toScreen = (mx: number, my: number) => ({
+    sx: panX + mx * scale,
+    sy: panY + my * scale,
+  });
+
+  c.save();
+
+  // Initial anchor positions (hollow rings — "where they were")
+  if (anchorsData && anchorsData.length >= 2) {
+    c.strokeStyle = "#d93025";
+    c.lineWidth = 1.5;
+    for (let i = 0; i + 1 < anchorsData.length; i += 2) {
+      const { sx, sy } = toScreen(anchorsData[i], anchorsData[i + 1]);
+      c.beginPath();
+      c.arc(sx, sy, 5, 0, 2 * Math.PI);
+      c.stroke();
+    }
+  }
+
+  // Current piece centers (solid dots — "where they are")
+  if (centersData && centersData.length >= 2) {
+    c.fillStyle = "#d93025";
+    for (let i = 0; i + 1 < centersData.length; i += 2) {
+      const { sx, sy } = toScreen(centersData[i], centersData[i + 1]);
+      c.beginPath();
+      c.arc(sx, sy, 3, 0, 2 * Math.PI);
+      c.fill();
+    }
+  }
+
+  c.restore();
+}
+
+// ─── Canvas ↔ Whimsy Hit-Testing Helpers ────────────────────
+
+/**
+ * Current scale factor: puzzle mm → screen pixels. Matches the
+ * transform set up inside `drawPuzzle`.
+ */
+function currentScale(): number {
+  if (puzzleWidth <= 0 || svgViewport.clientWidth <= 0) return 1;
+  return (svgViewport.clientWidth / puzzleWidth) * zoomLevel;
+}
+
+function cursorToMm(e: { clientX: number; clientY: number }): {
+  x: number;
+  y: number;
+} {
+  const rect = svgViewport.getBoundingClientRect();
+  const s = currentScale();
+  return {
+    x: (e.clientX - rect.left - panX) / s,
+    y: (e.clientY - rect.top - panY) / s,
+  };
+}
+
+/** Rotate (px, py) around (cx, cy) by `angleRad` (screen-space CCW when viewed normally — matches canvas Y-down convention). */
+function rotatePt(
+  px: number,
+  py: number,
+  cx: number,
+  cy: number,
+  angleRad: number,
+): { x: number; y: number } {
+  const dx = px - cx;
+  const dy = py - cy;
+  const c = Math.cos(angleRad);
+  const s = Math.sin(angleRad);
+  return { x: cx + dx * c - dy * s, y: cy + dx * s + dy * c };
+}
+
+/** Is `(mmX, mmY)` inside the whimsy's rotated square bbox? */
+function whimsyContains(w: WhimsyInstance, mmX: number, mmY: number): boolean {
+  const rad = (-w.rotation * Math.PI) / 180;
+  const local = rotatePt(mmX, mmY, w.centerX, w.centerY, rad);
+  const half = w.size / 2;
+  return (
+    local.x >= w.centerX - half &&
+    local.x <= w.centerX + half &&
+    local.y >= w.centerY - half &&
+    local.y <= w.centerY + half
+  );
+}
+
+/** Inverse-rotate a mm point into the whimsy's local (un-rotated) frame, then translate center to origin. */
+function whimsyLocal(w: WhimsyInstance, mmX: number, mmY: number): { x: number; y: number } {
+  const rad = (-w.rotation * Math.PI) / 180;
+  const p = rotatePt(mmX, mmY, w.centerX, w.centerY, rad);
+  return { x: p.x - w.centerX, y: p.y - w.centerY };
+}
+
+/**
+ * Compute the five manipulation handle positions for the given whimsy,
+ * in CSS-pixel screen coordinates. Four corner handles for uniform
+ * scale + one rotation handle above the top-middle. The rotation
+ * handle offset is in mm (scales with zoom) so it stays anchored to
+ * the whimsy rather than drifting away as you zoom out.
+ */
+function whimsyScreenHandles(w: WhimsyInstance): {
+  corners: Array<{ sx: number; sy: number; dir: CornerDir }>;
+  topMid: { sx: number; sy: number };
+  rotate: { sx: number; sy: number };
+} {
+  const s = currentScale();
+  const rad = (w.rotation * Math.PI) / 180;
+  const half = w.size / 2;
+  const mmToScreen = (mx: number, my: number) => ({
+    sx: panX + mx * s,
+    sy: panY + my * s,
+  });
+
+  const corners: Array<{ sx: number; sy: number; dir: CornerDir }> = [
+    { dx: -half, dy: -half, dir: "tl" as CornerDir },
+    { dx: +half, dy: -half, dir: "tr" as CornerDir },
+    { dx: +half, dy: +half, dir: "br" as CornerDir },
+    { dx: -half, dy: +half, dir: "bl" as CornerDir },
+  ].map((c) => {
+    const p = rotatePt(
+      w.centerX + c.dx,
+      w.centerY + c.dy,
+      w.centerX,
+      w.centerY,
+      rad,
+    );
+    return { ...mmToScreen(p.x, p.y), dir: c.dir };
+  });
+
+  const topMidMm = rotatePt(
+    w.centerX,
+    w.centerY - half,
+    w.centerX,
+    w.centerY,
+    rad,
+  );
+  const rotateOffsetMm = w.size * 0.125 + 7.5 / s;
+  const rotateMm = rotatePt(
+    w.centerX,
+    w.centerY - half - rotateOffsetMm,
+    w.centerX,
+    w.centerY,
+    rad,
+  );
+
+  return {
+    corners,
+    topMid: mmToScreen(topMidMm.x, topMidMm.y),
+    rotate: mmToScreen(rotateMm.x, rotateMm.y),
+  };
+}
+
+type HandleHit = CornerDir | "rotate" | null;
+function handleHitTest(w: WhimsyInstance, sx: number, sy: number): HandleHit {
+  const h = whimsyScreenHandles(w);
+  for (const c of h.corners) {
+    if (Math.hypot(sx - c.sx, sy - c.sy) <= HANDLE_HIT_RADIUS_PX) return c.dir;
+  }
+  if (Math.hypot(sx - h.rotate.sx, sy - h.rotate.sy) <= HANDLE_HIT_RADIUS_PX)
+    return "rotate";
+  return null;
+}
+
+function cursorForCorner(dir: CornerDir): string {
+  return dir === "tl" || dir === "br" ? "nwse-resize" : "nesw-resize";
+}
+
+function findWhimsyAt(mmX: number, mmY: number): WhimsyInstance | null {
+  // Iterate in reverse so the most-recently-added whimsy takes
+  // priority on overlap — matches the user's "top" mental model.
+  for (let i = whimsies.length - 1; i >= 0; i--) {
+    if (whimsyContains(whimsies[i], mmX, mmY)) return whimsies[i];
+  }
+  return null;
+}
+
+// ─── Selection Overlay ──────────────────────────────────────
+
+function drawSelectionOverlay(c: CanvasRenderingContext2D): void {
+  if (selectedWhimsyId === null) return;
+  const w = whimsies.find((x) => x.id === selectedWhimsyId);
+  if (!w) return;
+
+  const h = whimsyScreenHandles(w);
+  const scale = currentScale();
+
+  c.save();
+  c.lineCap = "round";
+  c.lineJoin = "round";
+
+  // Ghost of the whimsy shape at its current transform. The cached
+  // path lives in a 1 × 1 box with top-left at (0, 0); translate the
+  // center into screen coords, rotate, scale to whimsy size × zoom,
+  // then re-center the unit box so 0.5 sits at the whimsy center.
+  const unitPath = getShapeUnitPath(w.shape);
+  if (unitPath !== undefined && unitPath.length > 0) {
+    c.save();
+    c.translate(panX + w.centerX * scale, panY + w.centerY * scale);
+    c.rotate((w.rotation * Math.PI) / 180);
+    c.scale(w.size * scale, w.size * scale);
+    c.translate(-0.5, -0.5);
+    c.beginPath();
+    playCommands(c, unitPath);
+    c.restore();
+    c.fillStyle = "rgba(74, 144, 217, 0.12)";
+    c.strokeStyle = "rgba(74, 144, 217, 0.8)";
+    c.lineWidth = 1.5;
+    c.fill();
+    c.stroke();
+  }
+
+  // Dashed rotated bbox
+  c.strokeStyle = "#4a90d9";
+  c.lineWidth = 1.5;
+  c.setLineDash([5, 4]);
+  c.beginPath();
+  c.moveTo(h.corners[0].sx, h.corners[0].sy);
+  for (let i = 1; i < 4; i++) c.lineTo(h.corners[i].sx, h.corners[i].sy);
+  c.closePath();
+  c.stroke();
+  c.setLineDash([]);
+
+  // Line from top-middle to rotation handle
+  c.beginPath();
+  c.moveTo(h.topMid.sx, h.topMid.sy);
+  c.lineTo(h.rotate.sx, h.rotate.sy);
+  c.stroke();
+
+  // Corner handles (filled squares)
+  c.fillStyle = "#ffffff";
+  for (const cr of h.corners) {
+    c.beginPath();
+    c.rect(
+      cr.sx - HANDLE_SIZE_PX / 2,
+      cr.sy - HANDLE_SIZE_PX / 2,
+      HANDLE_SIZE_PX,
+      HANDLE_SIZE_PX,
+    );
+    c.fill();
+    c.stroke();
+  }
+
+  // Rotation handle (filled circle)
+  c.beginPath();
+  c.arc(h.rotate.sx, h.rotate.sy, HANDLE_SIZE_PX / 2 + 1, 0, 2 * Math.PI);
+  c.fill();
+  c.stroke();
+
+  c.restore();
 }
 
 // ─── Zoom/Pan Helpers ───────────────────────────────────────
@@ -431,26 +1444,36 @@ function scheduleGenerate(): void {
 
 // ─── Puzzle Generation ───────────────────────────────────────
 
-function generatePuzzle(): void {
+async function generatePuzzle(): Promise<void> {
   const config = buildConfig();
   const configJson = JSON.stringify(config);
 
-  // Generate binary edge data (also caches SVG internally for download)
-  const result = generate_edges_binary(configJson);
-  if (result && result.error) {
-    try {
-      errorDisplay.textContent = result.error || "Unknown error";
-    } catch {
-      errorDisplay.textContent = "Generation failed";
+  // Worker performs the WASM build off-main-thread. `requestBuild`
+  // coalesces — if multiple builds are queued in quick succession,
+  // only the latest one's result reaches us; older ones reject with
+  // BUILD_SUPERSEDED, which we silently swallow.
+  let result;
+  try {
+    result = await requestBuild(configJson);
+  } catch (err) {
+    if (err === BUILD_SUPERSEDED) {
+      // Newer build is already in flight — drop this stale result.
+      return;
     }
+    errorDisplay.textContent =
+      err instanceof Error ? err.message : "Generation failed";
     errorDisplay.style.display = "block";
     return;
   }
 
-  edgesData = result.edges;
-  borderData = result.border;
+  edgesData = result.edges ?? null;
+  borderData = result.border ?? null;
+  centersData = result.centers ?? null;
+  anchorsData = result.anchors ?? null;
   puzzleWidth = result.width;
   puzzleHeight = result.height;
+  edgesPath2D = edgesData ? binaryToPath2D(edgesData) : null;
+  borderPath2D = borderData ? binaryToPath2D(borderData) : null;
 
   errorDisplay.style.display = "none";
 
@@ -458,21 +1481,22 @@ function generatePuzzle(): void {
   const count = result.piece_count as number | undefined;
   const borderVal = borderShapeSelect.value;
   if (count != null) {
-    if (borderVal) {
-      pieceCount.textContent = `${count} pieces (${borderVal} border)`;
-    } else {
-      const rows = parseInt(rowsInput.value, 10);
-      const cols = parseInt(colsInput.value, 10);
-      const corners = 4;
-      const edges = 2 * (rows - 2) + 2 * (cols - 2);
-      const interior = (rows - 2) * (cols - 2);
-      pieceCount.textContent = `${count} pieces (${corners} corner, ${edges} edge, ${interior} interior)`;
+    const suffixes: string[] = [];
+    if (borderVal && borderVal !== "rectangle") {
+      suffixes.push(`${borderVal} border`);
     }
+    if (whimsies.length > 0) {
+      const typed = parseInt(pieceTargetInput.value, 10) || 0;
+      const fromWhimsies = Math.max(0, count - typed);
+      suffixes.push(
+        `${typed} + ${fromWhimsies} from ${whimsies.length} whims${whimsies.length === 1 ? "y" : "ies"}`,
+      );
+    }
+    pieceCount.textContent = suffixes.length
+      ? `${count} pieces (${suffixes.join(", ")})`
+      : `${count} pieces`;
   } else {
-    console.warn("piece_count missing from WASM response — falling back to rows * cols");
-    const rows = parseInt(rowsInput.value, 10);
-    const cols = parseInt(colsInput.value, 10);
-    pieceCount.textContent = `${rows * cols} pieces`;
+    pieceCount.textContent = `${pieceTargetInput.value} pieces`;
   }
 
   // Resize canvas and draw
@@ -481,53 +1505,13 @@ function generatePuzzle(): void {
 
   // Update URL with current params (debounced)
   scheduleURLUpdate();
-
-  // Update ruler
-  updateRuler();
-}
-
-// ─── Range Highlight ─────────────────────────────────────────
-
-function updateRangeHighlight(
-  minSlider: HTMLInputElement,
-  maxSlider: HTMLInputElement,
-  track: HTMLElement,
-  active: boolean,
-): void {
-  if (!active) {
-    track.style.setProperty("--range-bg", "#ddd");
-    return;
-  }
-  const min = parseFloat(minSlider.min);
-  const max = parseFloat(minSlider.max);
-  const range = max - min || 1;
-  const leftPct = ((parseFloat(minSlider.value) - min) / range) * 100;
-  const rightPct = ((parseFloat(maxSlider.value) - min) / range) * 100;
-  track.style.setProperty(
-    "--range-bg",
-    `linear-gradient(to right, #ddd ${leftPct}%, #4a90d9 ${leftPct}%, #4a90d9 ${rightPct}%, #ddd ${rightPct}%)`,
-  );
 }
 
 // ─── Readout Updaters ───────────────────────────────────────
-
-function updateReadouts(): void {
-  if (tabRandomize.checked) {
-    const minPct = Math.round(parseFloat(tabSlider.value) * 100);
-    const maxPct = Math.round(parseFloat(tabMaxSlider.value) * 100);
-    tabReadout.textContent = `${minPct}%-${maxPct}%`;
-  } else {
-    tabReadout.textContent = `${Math.round(parseFloat(tabSlider.value) * 100)}%`;
-  }
-  if (taperRandomize.checked) {
-    taperReadout.textContent = `${parseFloat(taperSlider.value).toFixed(2)}-${parseFloat(taperMaxSlider.value).toFixed(2)}`;
-  } else {
-    taperReadout.textContent = parseFloat(taperSlider.value).toFixed(2);
-  }
-  offsetReadout.textContent = parseFloat(offsetSlider.value).toFixed(2);
-  updateRangeHighlight(tabSlider, tabMaxSlider, tabTrack, tabRandomize.checked);
-  updateRangeHighlight(taperSlider, taperMaxSlider, taperTrack, taperRandomize.checked);
-}
+//
+// Currently a no-op — tab shape is fixed in the Rust layer. Kept as an
+// extension point for any future visible-value controls.
+function updateReadouts(): void {}
 
 // ─── Randomize Toggle Helpers ────────────────────────────────
 
@@ -607,59 +1591,6 @@ function convertDimensions(oldUnit: string, newUnit: string): void {
   }
 }
 
-// ─── Piece Count / Grid Auto-calc ─────────────────────────────
-
-function calcBestGrid(target: number): void {
-  const w = parseFloat(widthInput.value);
-  const h = parseFloat(heightInput.value);
-  if (isNaN(w) || isNaN(h) || w <= 0 || h <= 0 || isNaN(target) || target < 4) return;
-
-  let bestRows = 2;
-  let bestCols = 2;
-  let bestDist = Infinity;
-  let bestAspectDiff = Infinity;
-
-  const maxR = Math.min(target, 100);
-  for (let r = 2; r <= maxR; r++) {
-    let c = Math.round(target / r);
-    c = Math.max(2, Math.min(100, c));
-    // Skip grid ratios more extreme than 1:5
-    const gridRatio = Math.max(r, c) / Math.min(r, c);
-    if (gridRatio > 5) continue;
-
-    // Skip grids where individual pieces exceed 1:3 aspect ratio
-    const pAspect = Math.max((w / c) / (h / r), (h / r) / (w / c));
-    if (pAspect > 3) continue;
-
-    const total = r * c;
-    const dist = Math.abs(total - target);
-    // Piece aspect ratio: (w/c) / (h/r) — want closest to 1
-    const pieceAspect = (w / c) / (h / r);
-    const aspectDiff = Math.abs(pieceAspect - 1);
-
-    if (dist < bestDist || (dist === bestDist && aspectDiff < bestAspectDiff)) {
-      bestRows = r;
-      bestCols = c;
-      bestDist = dist;
-      bestAspectDiff = aspectDiff;
-    }
-  }
-
-  rowsInput.value = String(bestRows);
-  colsInput.value = String(bestCols);
-  updateTabMax();
-  updateReadouts();
-  scheduleGenerate();
-}
-
-function syncPieceCount(): void {
-  const rows = parseInt(rowsInput.value, 10);
-  const cols = parseInt(colsInput.value, 10);
-  if (!isNaN(rows) && !isNaN(cols)) {
-    pieceTargetInput.value = String(rows * cols);
-  }
-}
-
 function toggleLock(checkbox: HTMLInputElement, label: string): boolean {
   const active = checkbox.checked;
   const pill = checkbox.closest('.pill-toggle')!;
@@ -679,177 +1610,43 @@ function showWarnings(warnings: string[]): void {
   pieceSizeWarning.innerHTML = warnings.map((w) => `<li>${w}</li>`).join("");
 }
 
-function enforceConstraints(source: "grid" | "dims"): void {
-  let rows = parseInt(rowsInput.value, 10);
-  let cols = parseInt(colsInput.value, 10);
-  let w = parseFloat(widthInput.value);
-  let h = parseFloat(heightInput.value);
-  if (isNaN(rows) || isNaN(cols) || isNaN(w) || isNaN(h) || rows < 2 || cols < 2 || w <= 0 || h <= 0) {
+/**
+ * Advisory check: warn when the current W×H × shape combination
+ * can't fit the requested piece count without knobs falling below the
+ * ~3 mm neck-opening threshold. Never mutates inputs — the user is in
+ * charge of the dimensions, we just surface when the geometry will
+ * produce some straight-line (no-knob) edges instead of full knobs.
+ *
+ * Required area derivation:
+ *   required_area = piece_count × MIN_CELL_DIM² × shape_factor²
+ * where `shape_factor` accounts for hex-vs-square cells and (for
+ * shapes) the shape's bbox fill ratio.
+ */
+function enforceConstraints(): void {
+  const pc = parseInt(pieceTargetInput.value, 10);
+  const w = parseFloat(widthInput.value);
+  const h = parseFloat(heightInput.value);
+  if (isNaN(pc) || pc < 2 || isNaN(w) || isNaN(h) || w <= 0 || h <= 0) {
     pieceSizeWarning.innerHTML = "";
     return;
   }
 
   const factor = unitSelect.value === "Inches" ? 25.4 : 1;
+  const currentArea = w * factor * h * factor;
+  const mult = shapeDimMultiplier();
+  const requiredArea = pc * MIN_CELL_DIM_MM * MIN_CELL_DIM_MM * mult * mult;
+
   const warnings: string[] = [];
-  let adjusted = false;
-
-  if (source === "grid") {
-    // User changed grid — adjust dimensions (if unlocked)
-    const widthMM = w * factor;
-    const heightMM = h * factor;
-    const pieceW = widthMM / cols;
-    const pieceH = heightMM / rows;
-    const minDim = Math.min(pieceW, pieceH);
-
-    if (minDim < 10) {
-      if (dimsLocked) {
-        const display = minDim < 1 ? minDim.toFixed(1) : String(Math.round(minDim));
-        warnings.push(`Pieces are very small (~${display}mm). Unlock dimensions to auto-adjust.`);
-      } else {
-        // Scale up dimensions so smallest piece = 10mm
-        const needW = cols * 10;
-        const needH = rows * 10;
-        const newWMM = Math.max(widthMM, needW);
-        const newHMM = Math.max(heightMM, needH);
-        const newW = newWMM / factor;
-        const newH = newHMM / factor;
-        widthInput.value = unitSelect.value === "Inches"
-          ? parseFloat(newW.toFixed(2)).toString()
-          : String(Math.round(newW));
-        heightInput.value = unitSelect.value === "Inches"
-          ? parseFloat(newH.toFixed(2)).toString()
-          : String(Math.round(newH));
-        adjusted = true;
-      }
-    }
-
-    // Grid ratio check
-    const gridRatio = Math.max(rows, cols) / Math.min(rows, cols);
-    if (gridRatio > 5) {
-      warnings.push(`Grid ratio ${rows}:${cols} is very extreme. Max recommended ratio is 1:5.`);
-    }
-
-    // Piece aspect ratio check — re-read dims in case they were adjusted above
-    {
-      const curWMM = parseFloat(widthInput.value) * factor;
-      const curHMM = parseFloat(heightInput.value) * factor;
-      const curPW = curWMM / cols;
-      const curPH = curHMM / rows;
-      const pieceAspect = Math.max(curPW / curPH, curPH / curPW);
-      if (pieceAspect > 3) {
-        if (dimsLocked) {
-          warnings.push(`Pieces are very elongated (${pieceAspect.toFixed(1)}:1). Unlock dimensions to auto-adjust.`);
-        } else {
-          // Scale the shorter dimension up so aspect ratio = 3:1
-          if (curPW > curPH * 3) {
-            // pieces too wide — increase total height so pieceH = pieceW/3
-            const needH = (curWMM / cols) / 3 * rows;
-            const newHMM = Math.max(curHMM, needH);
-            const newH = newHMM / factor;
-            heightInput.value = unitSelect.value === "Inches"
-              ? parseFloat(newH.toFixed(2)).toString()
-              : String(Math.round(newH));
-          } else {
-            // pieces too tall — increase total width so pieceW = pieceH/3
-            const needW = (curHMM / rows) / 3 * cols;
-            const newWMM = Math.max(curWMM, needW);
-            const newW = newWMM / factor;
-            widthInput.value = unitSelect.value === "Inches"
-              ? parseFloat(newW.toFixed(2)).toString()
-              : String(Math.round(newW));
-          }
-          adjusted = true;
-        }
-      }
-    }
-  } else {
-    // User changed dimensions — adjust grid (if unlocked)
-    const widthMM = w * factor;
-    const heightMM = h * factor;
-    const pieceW = widthMM / cols;
-    const pieceH = heightMM / rows;
-    const minDim = Math.min(pieceW, pieceH);
-
-    if (minDim < 10) {
-      if (gridLocked) {
-        const display = minDim < 1 ? minDim.toFixed(1) : String(Math.round(minDim));
-        warnings.push(`Pieces are very small (~${display}mm). Unlock grid size to auto-adjust.`);
-      } else {
-        // Reduce grid so pieces >= 10mm
-        const maxCols = Math.max(2, Math.floor(widthMM / 10));
-        const maxRows = Math.max(2, Math.floor(heightMM / 10));
-        if (cols > maxCols) {
-          cols = maxCols;
-          colsInput.value = String(cols);
-          adjusted = true;
-        }
-        if (rows > maxRows) {
-          rows = maxRows;
-          rowsInput.value = String(rows);
-          adjusted = true;
-        }
-        if (adjusted) {
-          syncPieceCount();
-        }
-      }
-    }
-
-    // Grid ratio check after potential adjustment
-    const gridRatio = Math.max(rows, cols) / Math.min(rows, cols);
-    if (gridRatio > 5) {
-      if (gridLocked) {
-        warnings.push(`Grid ratio ${rows}:${cols} is very extreme. Unlock grid size to auto-adjust.`);
-      } else {
-        // Clamp the larger dimension to 5x the smaller
-        if (rows > cols) {
-          rows = Math.min(rows, cols * 5);
-          rowsInput.value = String(rows);
-        } else {
-          cols = Math.min(cols, rows * 5);
-          colsInput.value = String(cols);
-        }
-        syncPieceCount();
-        adjusted = true;
-      }
-    }
-
-    // Piece aspect ratio check — re-read values in case they were adjusted above
-    {
-      const curW = parseFloat(widthInput.value) * factor;
-      const curH = parseFloat(heightInput.value) * factor;
-      const curPieceW = curW / cols;
-      const curPieceH = curH / rows;
-      const pieceAspect = Math.max(curPieceW / curPieceH, curPieceH / curPieceW);
-      if (pieceAspect > 3) {
-        if (gridLocked) {
-          warnings.push(`Pieces are very elongated (${pieceAspect.toFixed(1)}:1). Unlock grid size to auto-adjust.`);
-        } else {
-          // Adjust rows/cols to bring piece aspect ratio within 3:1
-          const dimRatio = curH / curW;
-          const currentGridRatio = rows / cols;
-          if (currentGridRatio < dimRatio / 3) {
-            // Too few rows — pieces too wide. Increase rows.
-            rows = Math.max(2, Math.ceil(cols * dimRatio / 3));
-            rowsInput.value = String(rows);
-            adjusted = true;
-          } else if (currentGridRatio > dimRatio * 3) {
-            // Too many rows — pieces too tall. Increase cols.
-            cols = Math.max(2, Math.ceil(rows / (dimRatio * 3)));
-            colsInput.value = String(cols);
-            adjusted = true;
-          }
-          if (adjusted) syncPieceCount();
-        }
-      }
-    }
+  if (currentArea < requiredArea) {
+    const unitLabel = unitSelect.value === "Inches" ? "in" : "mm";
+    const scale = Math.sqrt(requiredArea / currentArea);
+    const suggestedW = Math.round((w * scale) * 10) / 10;
+    const suggestedH = Math.round((h * scale) * 10) / 10;
+    warnings.push(
+      `Dimensions are small for ${pc} pieces — some knobs will be thinner than 3mm. Try ≥ ${suggestedW} × ${suggestedH} ${unitLabel} for clean knobs.`,
+    );
   }
-
   showWarnings(warnings);
-
-  if (adjusted) {
-    updateTabMax();
-    updateReadouts();
-  }
 }
 
 // ─── Main ───────────────────────────────────────────────────
@@ -859,50 +1656,50 @@ async function main(): Promise<void> {
   const appEl = document.getElementById("app")!;
 
   try {
-    await init();
-    init_panic_hook();
-
+    // WASM is now loaded inside the regen worker (`worker-client.ts`).
+    // No init step needed on the main thread — `requestBuild` is
+    // available immediately and the worker handles its own init
+    // before processing the first message.
     loadingEl.style.display = "none";
     appEl.style.display = "block";
   } catch (err) {
-    loadingEl.textContent = `Failed to load WASM module: ${err}`;
-    console.error("WASM init failed:", err);
+    loadingEl.textContent = `Failed to load app: ${err}`;
+    console.error("App init failed:", err);
     return;
   }
 
   // Cache DOM references
-  rowsInput = document.getElementById("rows") as HTMLInputElement;
-  colsInput = document.getElementById("cols") as HTMLInputElement;
   widthInput = document.getElementById("width") as HTMLInputElement;
   heightInput = document.getElementById("height") as HTMLInputElement;
   unitSelect = document.getElementById("unit") as HTMLSelectElement;
-  tabSlider = document.getElementById("tab") as HTMLInputElement;
-  taperSlider = document.getElementById("taper") as HTMLInputElement;
   seedInput = document.getElementById("seed") as HTMLInputElement;
   pieceCount = document.getElementById("piece-count")!;
   errorDisplay = document.getElementById("error-display")!;
 
-  tabReadout = document.getElementById("tab-readout")!;
-  taperReadout = document.getElementById("taper-readout")!;
-  tabRandomize = document.getElementById("tab-randomize") as HTMLInputElement;
-  tabMaxSlider = document.getElementById("tab-max") as HTMLInputElement;
-  taperRandomize = document.getElementById("taper-randomize") as HTMLInputElement;
-  taperMaxSlider = document.getElementById("taper-max") as HTMLInputElement;
-  tabTrack = document.getElementById("tab-track")!;
-  taperTrack = document.getElementById("taper-track")!;
-
-  offsetSlider = document.getElementById("offset") as HTMLInputElement;
-  offsetReadout = document.getElementById("offset-readout")!;
-
   borderShapeSelect = document.getElementById("border-shape") as HTMLSelectElement;
+  cellAlgorithmSelect = document.getElementById(
+    "cell-algorithm",
+  ) as HTMLSelectElement;
+  poissonPolishSelect = document.getElementById(
+    "poisson-polish",
+  ) as HTMLSelectElement;
+  poissonPolishGroup = document.getElementById("poisson-polish-group")!;
 
   pieceTargetInput = document.getElementById("piece-target") as HTMLInputElement;
   pieceSizeWarning = document.getElementById("piece-size-warning")!;
-  gridLockCheckbox = document.getElementById("grid-lock") as HTMLInputElement;
   dimsLockCheckbox = document.getElementById("dims-lock") as HTMLInputElement;
+  knobsEnabledCheckbox = document.getElementById("knobs-enabled") as HTMLInputElement;
+  edgeKnobsEnabledCheckbox = document.getElementById("edge-knobs-enabled") as HTMLInputElement;
+  seedsVisibleCheckbox = document.getElementById("seeds-visible") as HTMLInputElement;
 
-  rulerWidth = document.getElementById("ruler-width")!;
-  rulerHeight = document.getElementById("ruler-height")!;
+  whimsyList = document.getElementById("whimsy-list") as HTMLUListElement;
+  addWhimsyBtn = document.getElementById("add-whimsy") as HTMLButtonElement;
+  shapePicker = document.getElementById("shape-picker") as HTMLDialogElement;
+
+  rulerHCanvas = document.getElementById("ruler-h") as HTMLCanvasElement;
+  rulerVCanvas = document.getElementById("ruler-v") as HTMLCanvasElement;
+  rulerHCtx = rulerHCanvas.getContext("2d");
+  rulerVCtx = rulerVCanvas.getContext("2d");
   svgViewport = document.getElementById("svg-viewport")!;
   zoomLevelDisplay = document.getElementById("zoom-level")!;
   zoomInBtn = document.getElementById("zoom-in")!;
@@ -925,9 +1722,9 @@ async function main(): Promise<void> {
   if (!hasUrlParams) {
     seedInput.value = randomSeed();
   }
+  // Reflect any whimsies restored from the URL into the sidebar.
+  renderWhimsies();
 
-  // Compute initial safe tab max and update slider readouts
-  updateTabMax();
   updateReadouts();
 
   // Track previous unit for dimension conversion on unit change
@@ -935,97 +1732,105 @@ async function main(): Promise<void> {
 
   // ─── Event Wiring ───────────────────────────────────────
 
-  // Lock toggle checkboxes
-  gridLockCheckbox.addEventListener("change", () => {
-    gridLocked = toggleLock(gridLockCheckbox, "grid size");
-  });
   dimsLockCheckbox.addEventListener("change", () => {
     dimsLocked = toggleLock(dimsLockCheckbox, "dimensions");
   });
 
-  // Grid inputs — rows/cols changed by user
-  for (const input of [rowsInput, colsInput]) {
-    input.addEventListener("input", () => {
-      syncPieceCount();
-      enforceConstraints("grid");
-      updateTabMax();
-      updateReadouts();
-      scheduleGenerate();
-    });
-  }
+  // Reflect the default-checked state into the pill's `.active` styling.
+  knobsEnabledCheckbox
+    .closest(".pill-toggle")
+    ?.classList.toggle("active", knobsEnabledCheckbox.checked);
+  knobsEnabledCheckbox.addEventListener("change", () => {
+    knobsEnabledCheckbox
+      .closest(".pill-toggle")
+      ?.classList.toggle("active", knobsEnabledCheckbox.checked);
+    scheduleGenerate();
+  });
 
-  // Dimension inputs — width/height changed by user
+  // Edge-piece knobs toggle: regenerates the puzzle so knobs near
+  // the boundary appear/disappear immediately.
+  edgeKnobsEnabledCheckbox
+    .closest(".pill-toggle")
+    ?.classList.toggle("active", edgeKnobsEnabledCheckbox.checked);
+  edgeKnobsEnabledCheckbox.addEventListener("change", () => {
+    edgeKnobsEnabledCheckbox
+      .closest(".pill-toggle")
+      ?.classList.toggle("active", edgeKnobsEnabledCheckbox.checked);
+    scheduleGenerate();
+  });
+
+  // Seeds toggle: redraw only, no regen needed (data already returned
+  // from WASM unconditionally).
+  seedsVisibleCheckbox
+    .closest(".pill-toggle")
+    ?.classList.toggle("active", seedsVisibleCheckbox.checked);
+  seedsVisibleCheckbox.addEventListener("change", () => {
+    seedsVisibleCheckbox
+      .closest(".pill-toggle")
+      ?.classList.toggle("active", seedsVisibleCheckbox.checked);
+    applyTransform();
+  });
+
+  // Piece count
+  pieceTargetInput.addEventListener("input", () => {
+    enforceConstraints();
+    scheduleGenerate();
+  });
+
+  // Dimension inputs
   for (const input of [widthInput, heightInput]) {
     input.addEventListener("input", () => {
-      enforceConstraints("dims");
-      updateTabMax();
-      updateReadouts();
+      enforceConstraints();
       scheduleGenerate();
     });
   }
 
-  // Piece count input — auto-calculate best grid
-  pieceTargetInput.addEventListener("input", () => {
-    const target = parseInt(pieceTargetInput.value, 10);
-    if (!isNaN(target) && target >= 4) {
-      calcBestGrid(target);
-      syncPieceCount();
-      enforceConstraints("grid");
-    }
-  });
-
-  // Range sliders — update readout + regenerate
-  const sliders = [tabSlider, taperSlider, offsetSlider];
-  for (const slider of sliders) {
-    slider.addEventListener("input", () => {
-      // When randomize is on, clamp min <= max
-      if (slider === tabSlider && tabRandomize.checked) {
-        clampMinMax(tabSlider, tabMaxSlider);
-      }
-      if (slider === taperSlider && taperRandomize.checked) {
-        clampMinMax(taperSlider, taperMaxSlider);
-      }
-      // Tab size affects offset max
-      if (slider === tabSlider) {
-        updateOffsetMax();
-      }
-      updateReadouts();
-      scheduleGenerate();
-    });
-  }
-
-  // Max sliders — clamp and regenerate
-  tabMaxSlider.addEventListener("input", () => {
-    clampMaxMin(tabSlider, tabMaxSlider);
-    updateOffsetMax();
-    updateReadouts();
-    scheduleGenerate();
-  });
-  taperMaxSlider.addEventListener("input", () => {
-    clampMaxMin(taperSlider, taperMaxSlider);
-    updateReadouts();
-    scheduleGenerate();
-  });
-  // Randomize checkboxes
-  tabRandomize.addEventListener("change", () => {
-    toggleRandomize(tabRandomize, tabMaxSlider, tabSlider);
-    updateOffsetMax();
-  });
-  taperRandomize.addEventListener("change", () => {
-    toggleRandomize(taperRandomize, taperMaxSlider, taperSlider);
-  });
-  // Unit select — convert dimensions and recalculate tab max
+  // Unit select — convert dimensions
   unitSelect.addEventListener("change", () => {
     const newUnit = unitSelect.value;
     convertDimensions(previousUnit, newUnit);
     previousUnit = newUnit;
-    updateTabMax();
     generatePuzzle();
-    enforceConstraints("dims");
+    enforceConstraints();
   });
 
-  // Border shape select — regenerate puzzle with new shape
-  borderShapeSelect.addEventListener("change", scheduleGenerate);
+  // Border shape select — required area depends on it, re-run
+  // constraints so dimensions auto-grow the moment it changes.
+  borderShapeSelect.addEventListener("change", () => {
+    enforceConstraints();
+    scheduleGenerate();
+  });
+
+  // Cell-generation algorithm select — switching algorithm is a
+  // structural change to the layout; trigger an immediate full
+  // regen and toggle the polish-iterations control's visibility
+  // (it's only meaningful for Poisson).
+  cellAlgorithmSelect.addEventListener("change", () => {
+    syncPoissonPolishVisibility();
+    scheduleGenerate();
+  });
+
+  // Polish iteration count — Poisson-only. Trigger a full regen on
+  // change so the user sees the effect immediately.
+  poissonPolishSelect.addEventListener("change", () => {
+    scheduleGenerate();
+  });
+
+  // Set initial visibility based on whatever URL/persisted state
+  // chose at load time.
+  syncPoissonPolishVisibility();
+
+  // Whimsies: open the shape picker; on close, add the selected shape.
+  addWhimsyBtn.addEventListener("click", () => {
+    shapePicker.showModal();
+  });
+  shapePicker.addEventListener("close", () => {
+    const value = shapePicker.returnValue;
+    if (value && value !== "cancel") {
+      addWhimsy(value);
+    }
+    shapePicker.returnValue = "";
+  });
 
   // Seed text input
   seedInput.addEventListener("input", scheduleGenerate);
@@ -1065,24 +1870,208 @@ async function main(): Promise<void> {
     { passive: false },
   );
 
-  // Mouse drag pan
+  // Mouse: routed by interaction mode — handle drag → scale/rotate
+  // whimsy, body drag → move whimsy, empty → pan and deselect.
   svgViewport.addEventListener("mousedown", (e: MouseEvent) => {
     if (e.button !== 0) return; // left click only
-    isPanning = true;
-    panStartX = e.clientX - panX;
-    panStartY = e.clientY - panY;
+    const rect = svgViewport.getBoundingClientRect();
+    const sx = e.clientX - rect.left;
+    const sy = e.clientY - rect.top;
+    const mm = cursorToMm(e);
+
+    // Priority 1: a handle on the currently-selected whimsy.
+    if (selectedWhimsyId !== null) {
+      const sel = whimsies.find((w) => w.id === selectedWhimsyId);
+      if (sel) {
+        const hit = handleHitTest(sel, sx, sy);
+        if (hit === "rotate") {
+          const angDeg =
+            (Math.atan2(mm.y - sel.centerY, mm.x - sel.centerX) * 180) /
+            Math.PI;
+          interaction = {
+            kind: "rotating-whimsy",
+            id: sel.id,
+            initialRotation: sel.rotation,
+            initialAngleDeg: angDeg,
+            committed: false,
+          };
+          e.preventDefault();
+          return;
+        } else if (hit !== null) {
+          const loc = whimsyLocal(sel, mm.x, mm.y);
+          const initialDist = Math.max(Math.abs(loc.x), Math.abs(loc.y));
+          interaction = {
+            kind: "scaling-whimsy",
+            id: sel.id,
+            corner: hit,
+            initialSize: sel.size,
+            initialDist: Math.max(1, initialDist),
+            committed: false,
+          };
+          e.preventDefault();
+          return;
+        }
+      }
+    }
+
+    // Priority 2: click inside any whimsy → select + begin drag.
+    const hitWhimsy = findWhimsyAt(mm.x, mm.y);
+    if (hitWhimsy) {
+      selectedWhimsyId = hitWhimsy.id;
+      interaction = {
+        kind: "dragging-whimsy",
+        id: hitWhimsy.id,
+        offsetX: hitWhimsy.centerX - mm.x,
+        offsetY: hitWhimsy.centerY - mm.y,
+        startCenterX: hitWhimsy.centerX,
+        startCenterY: hitWhimsy.centerY,
+        committed: false,
+      };
+      applyTransform();
+      e.preventDefault();
+      return;
+    }
+
+    // Priority 3: click empty canvas → deselect (if selected) and pan.
+    if (selectedWhimsyId !== null) {
+      selectedWhimsyId = null;
+      applyTransform();
+    }
+    interaction = {
+      kind: "panning",
+      startX: e.clientX - panX,
+      startY: e.clientY - panY,
+    };
     e.preventDefault();
   });
 
+  // Hover cursor feedback (only when idle — during a drag the browser
+  // holds the grab cursor automatically).
+  svgViewport.addEventListener("mousemove", (e: MouseEvent) => {
+    if (interaction.kind !== "idle") return;
+    const rect = svgViewport.getBoundingClientRect();
+    const sx = e.clientX - rect.left;
+    const sy = e.clientY - rect.top;
+    const mm = cursorToMm(e);
+    let cursor = "";
+    if (selectedWhimsyId !== null) {
+      const sel = whimsies.find((w) => w.id === selectedWhimsyId);
+      if (sel) {
+        const hit = handleHitTest(sel, sx, sy);
+        if (hit === "rotate") cursor = "grab";
+        else if (hit !== null) cursor = cursorForCorner(hit);
+      }
+    }
+    if (!cursor && findWhimsyAt(mm.x, mm.y)) cursor = "move";
+    svgViewport.style.cursor = cursor;
+  });
+
+  // Drag dispatch on window so motion outside the viewport still counts.
   window.addEventListener("mousemove", (e: MouseEvent) => {
-    if (!isPanning) return;
-    panX = e.clientX - panStartX;
-    panY = e.clientY - panStartY;
-    scheduleTransform();
+    if (interaction.kind === "idle") return;
+
+    if (interaction.kind === "panning") {
+      panX = e.clientX - interaction.startX;
+      panY = e.clientY - interaction.startY;
+      scheduleTransform();
+      return;
+    }
+
+    const w = whimsies.find((x) => x.id === interaction.id);
+    if (!w) return;
+    const mm = cursorToMm(e);
+
+    // Each branch builds a candidate copy of `w` with the new
+    // geometry, validates it against the clearance rules, and only
+    // mutates `w` if the candidate is valid. A candidate that
+    // collides with another whimsy or runs past the edge is silently
+    // ignored — the cursor moves but the whimsy stops at its last
+    // valid pose, snapping back into a legal state on release.
+    // Whimsy manipulation: only the ghost overlay updates during the
+    // drag (via `scheduleTransform`). The puzzle layout regen runs
+    // once on mouseup, against the final whimsy position. Threshold
+    // gating still applies so a click-without-drag doesn't regen.
+    if (interaction.kind === "dragging-whimsy") {
+      const candidate: WhimsyInstance = {
+        ...w,
+        centerX: mm.x + interaction.offsetX,
+        centerY: mm.y + interaction.offsetY,
+      };
+      if (whimsyPlacementValid(candidate, whimsies)) {
+        w.centerX = candidate.centerX;
+        w.centerY = candidate.centerY;
+        scheduleTransform();
+        if (!interaction.committed) {
+          const dx = w.centerX - interaction.startCenterX;
+          const dy = w.centerY - interaction.startCenterY;
+          if (
+            dx * dx + dy * dy >=
+            DRAG_REGEN_THRESHOLD_MM * DRAG_REGEN_THRESHOLD_MM
+          ) {
+            interaction.committed = true;
+          }
+        }
+      }
+    } else if (interaction.kind === "scaling-whimsy") {
+      const loc = whimsyLocal(w, mm.x, mm.y);
+      const dist = Math.max(Math.abs(loc.x), Math.abs(loc.y));
+      const ratio = dist / interaction.initialDist;
+      const candidate: WhimsyInstance = {
+        ...w,
+        size: Math.max(10, interaction.initialSize * ratio),
+      };
+      if (whimsyPlacementValid(candidate, whimsies)) {
+        w.size = candidate.size;
+        scheduleTransform();
+        if (!interaction.committed) {
+          const sizeRatio = w.size / interaction.initialSize;
+          if (Math.abs(sizeRatio - 1) >= SCALE_REGEN_THRESHOLD_RATIO) {
+            interaction.committed = true;
+          }
+        }
+      }
+    } else if (interaction.kind === "rotating-whimsy") {
+      const angDeg =
+        (Math.atan2(mm.y - w.centerY, mm.x - w.centerX) * 180) / Math.PI;
+      let rot =
+        interaction.initialRotation + (angDeg - interaction.initialAngleDeg);
+      rot = ((rot % 360) + 360) % 360;
+      const candidate: WhimsyInstance = { ...w, rotation: rot };
+      if (whimsyPlacementValid(candidate, whimsies)) {
+        w.rotation = rot;
+        scheduleTransform();
+        if (!interaction.committed) {
+          let delta = Math.abs(w.rotation - interaction.initialRotation);
+          // Wrap around so 359° vs 1° reads as a 2° delta, not 358°.
+          if (delta > 180) delta = 360 - delta;
+          if (delta >= ROTATE_REGEN_THRESHOLD_DEG) {
+            interaction.committed = true;
+          }
+        }
+      }
+    }
   });
 
   window.addEventListener("mouseup", () => {
-    isPanning = false;
+    // Capture committedness before flipping back to idle. If the
+    // user never moved past the regen threshold, nothing about the
+    // puzzle has changed and there's no need to commit a regen —
+    // the canonical layout that's already on screen is still
+    // canonical.
+    const committed =
+      (interaction.kind === "dragging-whimsy" ||
+        interaction.kind === "scaling-whimsy" ||
+        interaction.kind === "rotating-whimsy") &&
+      interaction.committed;
+    const wasWhimsy =
+      interaction.kind === "dragging-whimsy" ||
+      interaction.kind === "scaling-whimsy" ||
+      interaction.kind === "rotating-whimsy";
+    interaction = { kind: "idle" };
+    if (wasWhimsy) {
+      renderWhimsies();
+      if (committed) scheduleGenerate();
+    }
   });
 
   // Double-click to reset zoom
@@ -1126,11 +2115,13 @@ async function main(): Promise<void> {
     "touchstart",
     (e: TouchEvent) => {
       if (e.touches.length === 1) {
-        isPanning = true;
-        panStartX = e.touches[0].clientX - panX;
-        panStartY = e.touches[0].clientY - panY;
+        interaction = {
+          kind: "panning",
+          startX: e.touches[0].clientX - panX,
+          startY: e.touches[0].clientY - panY,
+        };
       } else if (e.touches.length === 2) {
-        isPanning = false;
+        interaction = { kind: "idle" };
         const dx = e.touches[0].clientX - e.touches[1].clientX;
         const dy = e.touches[0].clientY - e.touches[1].clientY;
         lastTouchDist = Math.sqrt(dx * dx + dy * dy);
@@ -1143,9 +2134,9 @@ async function main(): Promise<void> {
     "touchmove",
     (e: TouchEvent) => {
       e.preventDefault();
-      if (e.touches.length === 1 && isPanning) {
-        panX = e.touches[0].clientX - panStartX;
-        panY = e.touches[0].clientY - panStartY;
+      if (e.touches.length === 1 && interaction.kind === "panning") {
+        panX = e.touches[0].clientX - interaction.startX;
+        panY = e.touches[0].clientY - interaction.startY;
         scheduleTransform();
       } else if (e.touches.length === 2) {
         const dx = e.touches[0].clientX - e.touches[1].clientX;
@@ -1176,20 +2167,29 @@ async function main(): Promise<void> {
   );
 
   svgViewport.addEventListener("touchend", () => {
-    isPanning = false;
+    interaction = { kind: "idle" };
     lastTouchDist = 0;
   });
 
   // ─── Download SVG ──────────────────────────────────────
 
   const downloadBtn = document.getElementById("download")!;
-  downloadBtn.addEventListener("click", () => {
-    const svgContent = get_cached_svg();
+  downloadBtn.addEventListener("click", async () => {
+    const svgContent = await requestCachedSvg().catch(() => "");
     if (!svgContent || !svgContent.startsWith("<svg")) return;
     const config = buildConfig() as Record<string, unknown>;
+    const pc = config.piece_count as number;
     const border = config.border_shape as string | undefined;
-    const shapeSuffix = border ? `-${border}` : "";
-    const filename = `puzzle-${config.rows}x${config.cols}${shapeSuffix}-seed-${config.seed}.svg`;
+    const parts = ["puzzle", `${pc}pc`];
+    if (border && border !== "rectangle") parts.push(border);
+    if (whimsies.length > 0) {
+      parts.push(
+        `${whimsies.length}whims${whimsies.length === 1 ? "y" : "ies"}`,
+      );
+    }
+    const seed = (config.seed as string) || "seed";
+    parts.push(seed);
+    const filename = `${parts.join("-")}.svg`;
     const blob = new Blob([svgContent], { type: "image/svg+xml" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -1228,8 +2228,7 @@ async function main(): Promise<void> {
 
   // ─── Initial Generate ─────────────────────────────────────
 
-  syncPieceCount();
-  enforceConstraints("grid");
+  enforceConstraints();
   generatePuzzle();
   resetZoom();
 }

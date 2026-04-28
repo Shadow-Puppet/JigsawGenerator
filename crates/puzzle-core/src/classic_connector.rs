@@ -4,14 +4,26 @@ use rand_chacha::ChaCha8Rng;
 use crate::connector::ConnectorGenerator;
 use crate::edge::{EdgeParams, TabDirection};
 
+/// Knob width as a fraction of `min(edge_length, cross_length)`.
+pub const KNOB_WIDTH_RATIO: f64 = 0.25;
+
+/// Neck width as a fraction of knob width. `0.25` means the neck pinches
+/// to a quarter of the knob's body width — a strong snap-fit that still
+/// prints cleanly at laser-cutter resolution.
+pub const NECK_RATIO: f64 = 0.25;
+
 /// Ratio of knob height to knob width (height = width * this).
 const KNOB_HEIGHT_RATIO: f64 = 1.2;
 
-// Neck width ratio is now dynamic via params.neck_ratio (from TabConfig.taper).
-// taper=0.0 → neck_ratio=1.0, taper=0.5 → 0.75 (classic), taper=1.0 → 0.5.
-
 /// Neck height as a fraction of knob height (how tall the neck is before widening).
 const NECK_HEIGHT_RATIO: f64 = 0.35;
+
+/// Total horizontal span of the narrowest part of the knob (the "neck
+/// opening") as a fraction of `min(edge_length, cross_length)`. Derived
+/// from the two ratios above: `2 × KNOB_WIDTH_RATIO × NECK_RATIO`. Used
+/// by the layout layer to decide which edges are long enough to host a
+/// knob.
+pub const NECK_OPENING_RATIO: f64 = 2.0 * KNOB_WIDTH_RATIO * NECK_RATIO;
 
 /// How far beyond the knob top the control points overshoot (creates rounded top).
 const TOP_OVERSHOOT: f64 = 1.05;
@@ -67,15 +79,19 @@ impl ConnectorGenerator for ClassicKnobConnector {
             TabDirection::In => -1.0,
         };
 
-        // Knob center: shifted from midpoint by the offset fraction
-        let center = length * (0.5 + params.offset);
+        // Knob centered on the edge by default; `params.offset` shifts
+        // it along the edge axis (used by the slide phase of
+        // `resolve_knob_collisions` to push two colliding knobs along
+        // their respective edges).
+        let center = length * 0.5 + params.offset;
 
-        // Knob dimensions: use min(length, cross_length) so both axes produce
-        // identically-sized knobs regardless of grid aspect ratio.
+        // Knob dimensions scale with the edge: knob width is a fixed
+        // fraction of min(length, cross_length). Using the smaller
+        // dimension keeps the knob from overshooting a narrow neighbor.
         let base = length.min(params.cross_length);
-        let knob_w = base * params.tab_size;
+        let knob_w = base * KNOB_WIDTH_RATIO;
         let knob_h = knob_w * KNOB_HEIGHT_RATIO * dir_sign;
-        let neck_w = knob_w * params.neck_ratio;
+        let neck_w = knob_w * NECK_RATIO;
         let neck_h = knob_h * NECK_HEIGHT_RATIO;
 
         // Build 5 cubic bezier segments
@@ -189,8 +205,6 @@ mod tests {
             length: 50.0,
             cross_length: 50.0,
             direction,
-            tab_size: 0.25,
-            neck_ratio: 0.75,
             offset: 0.0,
         }
     }
@@ -355,49 +369,31 @@ mod tests {
     // ─── Proportion Tests ─────────────────────────────────────────
 
     #[test]
-    fn test_tab_size_affects_proportions() {
+    fn test_edge_length_scales_knob_proportionally() {
+        // Knob width = 0.25 * min(length, cross_length), so a 2×-longer
+        // edge should produce a 2×-taller knob.
         let connector = ClassicKnobConnector;
-
-        let small_params = EdgeParams {
-            length: 50.0,
-            cross_length: 50.0,
+        let short = EdgeParams {
+            length: 30.0,
+            cross_length: 30.0,
             direction: TabDirection::Out,
-            tab_size: 0.15,
-            neck_ratio: 0.75,
             offset: 0.0,
         };
-
-        let large_params = EdgeParams {
-            length: 50.0,
-            cross_length: 50.0,
+        let long = EdgeParams {
+            length: 60.0,
+            cross_length: 60.0,
             direction: TabDirection::Out,
-            tab_size: 0.25,
-            neck_ratio: 0.75,
             offset: 0.0,
         };
-
-        let mut rng1 = create_rng("size-test");
-        let small_curves = connector.generate(&small_params, &mut rng1);
-        let mut rng2 = create_rng("size-test");
-        let large_curves = connector.generate(&large_params, &mut rng2);
-
-        assert!(!small_curves.is_empty() && !large_curves.is_empty());
-
-        // Max y extent of large tab should be bigger than small tab
-        let max_y_small = small_curves
-            .iter()
-            .flat_map(|c| [c.p0.y, c.p1.y, c.p2.y, c.p3.y])
-            .fold(0.0f64, f64::max);
-        let max_y_large = large_curves
-            .iter()
-            .flat_map(|c| [c.p0.y, c.p1.y, c.p2.y, c.p3.y])
-            .fold(0.0f64, f64::max);
-
+        let mut rng = create_rng("scale-test");
+        let s = connector.generate(&short, &mut rng);
+        let l = connector.generate(&long, &mut rng);
+        let max_y_short = s.iter().flat_map(|c| [c.p0.y, c.p1.y, c.p2.y, c.p3.y]).fold(0.0f64, f64::max);
+        let max_y_long = l.iter().flat_map(|c| [c.p0.y, c.p1.y, c.p2.y, c.p3.y]).fold(0.0f64, f64::max);
+        let ratio = max_y_long / max_y_short;
         assert!(
-            max_y_large > max_y_small,
-            "larger tab_size should produce larger y extent: small={}, large={}",
-            max_y_small,
-            max_y_large
+            (ratio - 2.0).abs() < 0.05,
+            "knob height ratio should ~= 2.0 for 2×-length edge, got {ratio}"
         );
     }
 
@@ -432,8 +428,6 @@ mod tests {
             length: 100.0,
             cross_length: 40.0,
             direction: TabDirection::Out,
-            tab_size: 0.25,
-            neck_ratio: 0.75,
             offset: 0.0,
         };
         let h_curves = connector.generate(&h_params, &mut rng);
@@ -443,8 +437,6 @@ mod tests {
             length: 40.0,
             cross_length: 100.0,
             direction: TabDirection::Out,
-            tab_size: 0.25,
-            neck_ratio: 0.75,
             offset: 0.0,
         };
         let mut rng2 = create_rng("uniform-test");
@@ -477,8 +469,6 @@ mod tests {
             length: 100.0,
             cross_length: 20.0,
             direction: TabDirection::Out,
-            tab_size: 0.25,
-            neck_ratio: 0.75,
             offset: 0.0,
         };
         let mut rng = create_rng("extreme-test");
@@ -505,8 +495,6 @@ mod tests {
             length: 50.0,
             cross_length: 50.0,
             direction: TabDirection::Out,
-            tab_size: 0.25,
-            neck_ratio: 0.75,
             offset: 0.0,
         };
         let mut rng = create_rng("neck-test");

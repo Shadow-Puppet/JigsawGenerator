@@ -9,6 +9,13 @@ kurbo = { version = "0.13", features = ["serde"] }
 rand = { version = "0.10", default-features = false }
 rand_chacha = "0.10"
 linesweeper = "0.3"
+voronoice = "0.2"
+
+# Browser-side perf instrumentation. Used for `phase_now`/`phase_log`
+# in `cvt.rs` so the WASM build can emit timings into the dev console.
+# Native builds get no-op stubs.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+web-sys = { version = "0.3", features = ["console", "Performance", "Window"] }
 
 [dev-dependencies]
 serde_json = "1.0"

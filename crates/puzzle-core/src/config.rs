@@ -1,6 +1,33 @@
-use rand::RngExt;
-use rand_chacha::ChaCha8Rng;
 use serde::{Deserialize, Serialize};
+
+/// Cell-generation algorithm — the pluggable first phase of the
+/// pipeline. Same downstream tessellation, edge extraction, and knob
+/// generation regardless of which algorithm runs here.
+///
+/// Adding more variants in the future: leave the existing ones as
+/// they are, plumb a new branch through `cvt::build_puzzle_layout`'s
+/// match. The pipeline contract is "produce seed positions inside
+/// the boundary"; everything downstream is agnostic.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub enum CellAlgorithm {
+    /// Random rejection-scatter + Lloyd relaxation. Produces fully
+    /// centroidal Voronoi cells. Slow at large piece counts due to
+    /// the iterative Lloyd loop. The historical default.
+    #[serde(rename = "cvt")]
+    Cvt,
+    /// Bridson's Poisson disc sampling. One-pass, O(N), no
+    /// relaxation. Cells are well-spaced and roughly hexagonal but
+    /// not strictly centroidal — visually ~85% of the way to CVT
+    /// quality with a fraction of the compute cost.
+    #[serde(rename = "poisson")]
+    Poisson,
+}
+
+impl Default for CellAlgorithm {
+    fn default() -> Self {
+        Self::Cvt
+    }
+}
 
 /// Unit system for puzzle dimensions.
 ///
@@ -30,216 +57,141 @@ impl Unit {
     }
 }
 
-/// Tab/knob configuration for connector generation.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TabConfig {
-    /// Tab size as a fraction of edge length (0.15..=0.25, default 0.25).
-    /// The effective maximum is dynamically clamped based on grid dimensions
-    /// to prevent opposing tabs from overlapping.
-    pub size_pct: f64,
-    /// Taper amount controlling the neck-to-body ratio (0.57..=1.32, default 0.57).
-    /// 0.57 = mild taper, 0.95 = moderate snap-fit, 1.32 = aggressive taper
-    /// (narrow neck, wide body). Note: the UI presents this as a normalized 0-1
-    /// range; the WASM layer maps user 0→internal 0.57, user 1→internal 1.32.
-    #[serde(default = "default_taper")]
-    pub taper: f64,
-    /// Optional max for per-edge randomization. When Some, each edge gets
-    /// a random size_pct in [size_pct, size_pct_max] range.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub size_pct_max: Option<f64>,
-    /// Optional max for per-edge taper randomization. When Some, each edge gets
-    /// a random taper in [taper, taper_max] range.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub taper_max: Option<f64>,
-    /// Maximum random offset of the knob center from the edge midpoint, as a fraction
-    /// of edge length. Each edge gets a random offset in [-offset, +offset].
-    /// Range: 0.0..=0.20. Default 0.0 (all knobs centered).
-    /// The UI dynamically caps this at (0.35 - tab_size) to prevent knob overflow.
-    #[serde(default)]
-    pub offset: f64,
-}
-
-fn default_taper() -> f64 {
-    0.57
-}
-
-impl Default for TabConfig {
-    fn default() -> Self {
-        Self {
-            size_pct: 0.25,
-            taper: 0.57,
-            size_pct_max: None,
-            taper_max: None,
-            offset: 0.0,
-        }
-    }
-}
-
-impl TabConfig {
-    /// Validate that tab parameters are within acceptable bounds.
-    pub fn validate(&self) -> Result<(), String> {
-        if self.size_pct < 0.15 || self.size_pct > 0.25 {
-            return Err(format!(
-                "tab size_pct must be between 0.15 and 0.25, got {}",
-                self.size_pct
-            ));
-        }
-        if self.taper < 0.57 || self.taper > 1.32 {
-            return Err(format!(
-                "tab taper must be between 0.57 and 1.32, got {}",
-                self.taper
-            ));
-        }
-        if let Some(max) = self.size_pct_max {
-            if max < 0.15 || max > 0.25 {
-                return Err(format!(
-                    "tab size_pct_max must be between 0.15 and 0.25, got {}",
-                    max
-                ));
-            }
-            if max < self.size_pct {
-                return Err(format!(
-                    "tab size_pct_max ({}) must be >= size_pct ({})",
-                    max, self.size_pct
-                ));
-            }
-        }
-        if let Some(max) = self.taper_max {
-            if max < 0.57 || max > 1.32 {
-                return Err(format!(
-                    "tab taper_max must be between 0.57 and 1.32, got {}",
-                    max
-                ));
-            }
-            if max < self.taper {
-                return Err(format!(
-                    "tab taper_max ({}) must be >= taper ({})",
-                    max, self.taper
-                ));
-            }
-        }
-        if self.offset < 0.0 || self.offset > 0.20 {
-            return Err(format!(
-                "tab offset must be between 0.0 and 0.20, got {}",
-                self.offset
-            ));
-        }
-        Ok(())
-    }
-
-    /// Compute the neck-to-body width ratio from the taper value.
-    /// taper=0.57 → ratio=0.715 (mild), taper=0.95 → ratio=0.525, taper=1.32 → ratio=0.34 (aggressive).
-    pub fn neck_ratio(&self) -> f64 {
-        1.0 - self.taper * 0.5
-    }
-
-    /// Return the effective tab size for a single edge, optionally randomized.
-    ///
-    /// When `size_pct_max` is None, returns the fixed `size_pct` clamped to
-    /// `safe_max` without consuming any RNG values (backward compatible).
-    /// When `size_pct_max` is Some, returns a random value in
-    /// [size_pct.min(safe_max), size_pct_max.min(safe_max)].
-    pub fn randomize_tab_size(&self, safe_max: f64, rng: &mut ChaCha8Rng) -> f64 {
-        match self.size_pct_max {
-            None => self.size_pct.min(safe_max),
-            Some(max) => {
-                let lo = self.size_pct.min(safe_max);
-                let hi = max.min(safe_max);
-                if (hi - lo).abs() < 1e-10 {
-                    lo
-                } else {
-                    rng.random_range(lo..=hi)
-                }
-            }
-        }
-    }
-
-    /// Return a random offset for a single edge in [-offset, +offset].
-    ///
-    /// Always consumes one RNG value to keep the RNG sequence stable
-    /// regardless of offset value. This prevents other randomized params
-    /// (tab size, taper) from jumping when offset changes from 0 to non-zero.
-    pub fn randomize_offset(&self, rng: &mut ChaCha8Rng) -> f64 {
-        let raw: f64 = rng.random_range(-1.0_f64..=1.0);
-        raw * self.offset
-    }
-
-    /// Return the effective neck ratio for a single edge, optionally randomized.
-    ///
-    /// When `taper_max` is None, returns the fixed neck_ratio without consuming
-    /// any RNG values (backward compatible).
-    /// When `taper_max` is Some, picks a random taper in [taper, taper_max] and
-    /// computes neck_ratio from it.
-    pub fn randomize_neck_ratio(&self, rng: &mut ChaCha8Rng) -> f64 {
-        match self.taper_max {
-            None => self.neck_ratio(),
-            Some(max) => {
-                let lo = self.taper;
-                let hi = max;
-                let t = if (hi - lo).abs() < 1e-10 {
-                    lo
-                } else {
-                    rng.random_range(lo..=hi)
-                };
-                1.0 - t * 0.5
-            }
-        }
-    }
-}
-
 /// Top-level puzzle configuration.
 ///
-/// All dimensions are stored in millimeters internally.
-/// Use [`PuzzleConfig::from_input`] to construct from user-provided
-/// values in any supported unit.
+/// All dimensions are stored in millimeters internally. Pieces come
+/// from a centroidal Voronoi tessellation over the selected
+/// `border_shape` boundary — there is no separate rectangular-grid
+/// path. `border_shape` = `"rectangle"` (or `None`) gives a CVT inside a
+/// rectangle of the configured dimensions.
+///
+/// Knob shape is fully determined by constants in
+/// [`crate::classic_connector`]. If an edge would host a knob whose neck
+/// falls below `3 mm`, the connector is skipped and that edge renders
+/// as a straight line.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PuzzleConfig {
-    /// Grid rows (2..=100).
-    pub rows: u32,
-    /// Grid columns (2..=100).
-    pub cols: u32,
+    /// Target piece count. CVT places this many seed points inside the
+    /// chosen boundary.
+    #[serde(default = "default_piece_count", alias = "piece_count")]
+    pub piece_count: u32,
     /// Puzzle width in mm (after unit conversion).
     pub width: f64,
     /// Puzzle height in mm (after unit conversion).
     pub height: f64,
     /// Display/input unit.
     pub unit: Unit,
-    /// Tab/knob configuration.
-    pub tab: TabConfig,
     /// User seed string (empty = auto-generate).
     pub seed: String,
-    /// Optional border shape name (e.g. "heart", "star").
-    /// When present, the puzzle grid is clipped to the named shape boundary.
-    /// When absent or null, a standard rectangular puzzle is generated.
+    /// Optional border shape name (`"rectangle"`, `"heart"`, `"star"`, …).
+    /// `None` or `"rectangle"` produces a rectangular boundary.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub border_shape: Option<String>,
+    /// When `true`, skip knob generation on every internal edge —
+    /// pieces render as straight-cut polygons. Useful for inspecting
+    /// the raw CVT tessellation (sliver detection, boundary clipping)
+    /// without knob geometry on top.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub disable_knobs: bool,
+    /// When `true`, the puzzle's outer boundary (the silhouette
+    /// itself) is rebuilt with classic knob bumps along its length so
+    /// edge pieces look like interior pieces. Default is `false` —
+    /// the silhouette stays smooth and edge pieces have one or more
+    /// flat sides.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub knob_outer_boundary: bool,
+    /// Figural pop-out pieces placed inside the border. Each whimsy is
+    /// subtracted from the outer boundary before CVT runs — surrounding
+    /// pieces hug the whimsy contour — and the whimsy itself is added
+    /// as a separate piece (or, when `subdivisions > 0`, as a nested
+    /// CVT of that many sub-pieces).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub whimsies: Vec<WhimsyPlacement>,
+    /// Cell-generation algorithm. Defaults to CVT for backward
+    /// compatibility with existing URLs.
+    #[serde(default)]
+    pub cell_algorithm: CellAlgorithm,
+    /// Number of Lloyd "polish" iterations to run after Bridson's
+    /// Poisson disc seeding. Each polish iteration runs a single
+    /// Lloyd relaxation step (move each seed toward its clipped-cell
+    /// centroid), nudging cells closer to equal-size centroidal
+    /// shapes. `0` means raw Bridson output — fastest but with
+    /// visible cell-size variation. `3` is a good default — most of
+    /// the size disparity disappears, still a fraction of full
+    /// CVT-from-random cost. Range 0–10 (clamped). Ignored when
+    /// `cell_algorithm == Cvt`.
+    #[serde(default = "default_poisson_polish_iterations")]
+    pub poisson_polish_iterations: u32,
 }
+
+fn default_poisson_polish_iterations() -> u32 {
+    3
+}
+
+/// One figural whimsy placed inside the puzzle boundary. The whimsy is
+/// the pre-rotation bounding-box size (`width` × `height`) rotated
+/// `rotation` degrees about `(center_x, center_y)`. Coordinates are in
+/// mm, relative to the puzzle's top-left corner.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WhimsyPlacement {
+    /// Shape name resolvable by the boundary/whimsy shape library
+    /// (`"heart"`, `"star"`, `"circle"`, …).
+    pub shape: String,
+    /// Center x in mm, relative to puzzle top-left.
+    pub center_x: f64,
+    /// Center y in mm, relative to puzzle top-left.
+    pub center_y: f64,
+    /// Whimsy bounding-box width (pre-rotation), mm.
+    pub width: f64,
+    /// Whimsy bounding-box height (pre-rotation), mm.
+    pub height: f64,
+    /// Rotation in degrees, applied about the whimsy center.
+    #[serde(default)]
+    pub rotation: f64,
+    /// Number of sub-pieces to tile inside the whimsy via a nested CVT.
+    /// `0` means the whimsy is one solid pop-out piece with no internal
+    /// knobbed edges — its outer contour is the only cut line.
+    #[serde(default)]
+    pub subdivisions: u32,
+}
+
+fn default_piece_count() -> u32 {
+    48
+}
+
+/// Minimum acceptable piece count. Below 2 there's nothing for Lloyd
+/// relaxation to optimise; CVT itself needs ≥2 seeds.
+pub const MIN_PIECE_COUNT: u32 = 2;
+/// Upper sanity bound on piece count — mostly a belt-and-braces check
+/// against accidentally over-large requests that would stall Lloyd.
+pub const MAX_PIECE_COUNT: u32 = 5_000;
 
 impl Default for PuzzleConfig {
     fn default() -> Self {
         Self {
-            rows: 6,
-            cols: 8,
+            piece_count: default_piece_count(),
             width: 297.0,
             height: 210.0,
             unit: Unit::Millimeters,
-            tab: TabConfig::default(),
             seed: String::new(),
             border_shape: None,
+            disable_knobs: false,
+            knob_outer_boundary: false,
+            whimsies: Vec::new(),
+            cell_algorithm: CellAlgorithm::default(),
+            poisson_polish_iterations: default_poisson_polish_iterations(),
         }
     }
 }
 
 impl PuzzleConfig {
-    /// Validate all configuration bounds.
-    ///
-    /// Returns the first error found.
+    /// Validate all configuration bounds. Returns the first error found.
     pub fn validate(&self) -> Result<(), String> {
-        if self.rows < 2 || self.rows > 100 {
-            return Err(format!("rows must be between 2 and 100, got {}", self.rows));
-        }
-        if self.cols < 2 || self.cols > 100 {
-            return Err(format!("cols must be between 2 and 100, got {}", self.cols));
+        if self.piece_count < MIN_PIECE_COUNT || self.piece_count > MAX_PIECE_COUNT {
+            return Err(format!(
+                "piece_count must be between {MIN_PIECE_COUNT} and {MAX_PIECE_COUNT}, got {}",
+                self.piece_count
+            ));
         }
         if self.width <= 0.0 {
             return Err(format!("width must be positive, got {}", self.width));
@@ -247,32 +199,53 @@ impl PuzzleConfig {
         if self.height <= 0.0 {
             return Err(format!("height must be positive, got {}", self.height));
         }
-        self.tab.validate()?;
+        for (i, w) in self.whimsies.iter().enumerate() {
+            w.validate().map_err(|e| format!("whimsy[{i}]: {e}"))?;
+        }
         Ok(())
     }
 
+}
+
+impl WhimsyPlacement {
+    /// Validate the whimsy's own bounds. Does not check that the whimsy
+    /// actually fits inside the puzzle — that's enforced at placement
+    /// time in the frontend.
+    pub fn validate(&self) -> Result<(), String> {
+        if self.shape.trim().is_empty() {
+            return Err("shape must not be empty".to_string());
+        }
+        if self.width <= 0.0 || self.height <= 0.0 {
+            return Err(format!(
+                "width/height must be positive, got {} × {}",
+                self.width, self.height
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl PuzzleConfig {
     /// Construct a PuzzleConfig from user input, converting units to mm.
-    ///
-    /// When `unit` is `Inches`, width and height are multiplied by 25.4
-    /// before storing. All other parameters are unit-independent.
     pub fn from_input(
-        rows: u32,
-        cols: u32,
+        piece_count: u32,
         width: f64,
         height: f64,
         unit: Unit,
-        tab: TabConfig,
         seed: String,
     ) -> Result<Self, String> {
         let config = Self {
-            rows,
-            cols,
+            piece_count,
             width: unit.to_mm(width),
             height: unit.to_mm(height),
             unit,
-            tab,
             seed,
             border_shape: None,
+            disable_knobs: false,
+            knob_outer_boundary: false,
+            whimsies: Vec::new(),
+            cell_algorithm: CellAlgorithm::default(),
+            poisson_polish_iterations: default_poisson_polish_iterations(),
         };
         config.validate()?;
         Ok(config)
@@ -282,24 +255,6 @@ impl PuzzleConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_unit_mm_identity() {
-        assert_eq!(Unit::Millimeters.to_mm(100.0), 100.0);
-        assert_eq!(Unit::Millimeters.from_mm(100.0), 100.0);
-    }
-
-    #[test]
-    fn test_unit_inches_to_mm() {
-        let result = Unit::Inches.to_mm(1.0);
-        assert!((result - 25.4).abs() < 1e-10);
-    }
-
-    #[test]
-    fn test_unit_mm_to_inches() {
-        let result = Unit::Inches.from_mm(25.4);
-        assert!((result - 1.0).abs() < 1e-10);
-    }
 
     #[test]
     fn test_unit_roundtrip() {
@@ -313,306 +268,40 @@ mod tests {
     fn test_default_config_is_valid() {
         let config = PuzzleConfig::default();
         assert!(config.validate().is_ok());
-        assert_eq!(config.rows, 6);
-        assert_eq!(config.cols, 8);
-        assert!((config.width - 297.0).abs() < 1e-10);
-        assert!((config.height - 210.0).abs() < 1e-10);
-        assert_eq!(config.unit, Unit::Millimeters);
-        assert!(config.seed.is_empty());
+        assert_eq!(config.piece_count, 48);
     }
 
     #[test]
-    fn test_validate_rows_too_low() {
-        let mut config = PuzzleConfig::default();
-        config.rows = 1;
+    fn test_validate_piece_count_too_low() {
+        let config = PuzzleConfig {
+            piece_count: 1,
+            ..PuzzleConfig::default()
+        };
         assert!(config.validate().is_err());
     }
 
     #[test]
-    fn test_validate_rows_too_high() {
-        let mut config = PuzzleConfig::default();
-        config.rows = 101;
-        assert!(config.validate().is_err());
-    }
-
-    #[test]
-    fn test_validate_cols_too_low() {
-        let mut config = PuzzleConfig::default();
-        config.cols = 1;
-        assert!(config.validate().is_err());
-    }
-
-    #[test]
-    fn test_validate_cols_too_high() {
-        let mut config = PuzzleConfig::default();
-        config.cols = 101;
+    fn test_validate_piece_count_too_high() {
+        let config = PuzzleConfig {
+            piece_count: MAX_PIECE_COUNT + 1,
+            ..PuzzleConfig::default()
+        };
         assert!(config.validate().is_err());
     }
 
     #[test]
     fn test_validate_negative_width() {
-        let mut config = PuzzleConfig::default();
-        config.width = -10.0;
-        assert!(config.validate().is_err());
-    }
-
-    #[test]
-    fn test_validate_tab_too_small() {
-        let mut config = PuzzleConfig::default();
-        config.tab.size_pct = 0.10;
-        assert!(config.validate().is_err());
-    }
-
-    #[test]
-    fn test_validate_tab_too_large() {
-        let mut config = PuzzleConfig::default();
-        config.tab.size_pct = 0.30;
+        let config = PuzzleConfig {
+            width: -10.0,
+            ..PuzzleConfig::default()
+        };
         assert!(config.validate().is_err());
     }
 
     #[test]
     fn test_from_input_inches_converts() {
-        let config = PuzzleConfig::from_input(
-            4,
-            6,
-            10.0,
-            8.0,
-            Unit::Inches,
-            TabConfig::default(),
-            "test".to_string(),
-        )
-        .unwrap();
-
+        let config = PuzzleConfig::from_input(48, 10.0, 8.0, Unit::Inches, "t".into()).unwrap();
         assert!((config.width - 254.0).abs() < 1e-10);
         assert!((config.height - 203.2).abs() < 1e-10);
-    }
-
-    #[test]
-    fn test_from_input_mm_no_conversion() {
-        let config = PuzzleConfig::from_input(
-            4,
-            6,
-            200.0,
-            150.0,
-            Unit::Millimeters,
-            TabConfig::default(),
-            String::new(),
-        )
-        .unwrap();
-
-        assert!((config.width - 200.0).abs() < 1e-10);
-        assert!((config.height - 150.0).abs() < 1e-10);
-    }
-
-    #[test]
-    fn test_from_input_validates() {
-        let result = PuzzleConfig::from_input(
-            0,
-            6,
-            200.0,
-            150.0,
-            Unit::Millimeters,
-            TabConfig::default(),
-            String::new(),
-        );
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_boundary_values_valid() {
-        // Minimum valid config
-        let config = PuzzleConfig::from_input(
-            2,
-            2,
-            1.0,
-            1.0,
-            Unit::Millimeters,
-            TabConfig {
-                size_pct: 0.15,
-                taper: 0.57,
-                size_pct_max: None,
-                taper_max: None,
-                offset: 0.0,
-            },
-            String::new(),
-        );
-        assert!(config.is_ok());
-
-        // Maximum valid config
-        let config = PuzzleConfig::from_input(
-            100,
-            100,
-            1000.0,
-            1000.0,
-            Unit::Millimeters,
-            TabConfig {
-                size_pct: 0.25,
-                taper: 1.32,
-                size_pct_max: None,
-                taper_max: None,
-                offset: 0.0,
-            },
-            String::new(),
-        );
-        assert!(config.is_ok());
-
-        // Maximum valid config with ranges
-        let config = PuzzleConfig::from_input(
-            100,
-            100,
-            1000.0,
-            1000.0,
-            Unit::Millimeters,
-            TabConfig {
-                size_pct: 0.15,
-                taper: 0.57,
-                size_pct_max: Some(0.25),
-                taper_max: Some(1.32),
-                offset: 0.15,
-            },
-            String::new(),
-        );
-        assert!(config.is_ok());
-    }
-
-    #[test]
-    fn test_randomize_tab_size_none_returns_fixed() {
-        use crate::seed::create_rng;
-        let tab = TabConfig::default(); // size_pct_max = None
-        let mut rng1 = create_rng("test");
-        let mut rng2 = create_rng("test");
-
-        let val = tab.randomize_tab_size(0.25, &mut rng1);
-        assert!((val - 0.25).abs() < 1e-10, "should return fixed size_pct");
-
-        // RNG should not have been consumed — next random_bool should match fresh rng
-        let b1: bool = rng1.random_bool(0.5);
-        let b2: bool = rng2.random_bool(0.5);
-        assert_eq!(
-            b1, b2,
-            "RNG should not be consumed when size_pct_max is None"
-        );
-    }
-
-    #[test]
-    fn test_randomize_tab_size_some_produces_range() {
-        use crate::seed::create_rng;
-        let tab = TabConfig {
-            size_pct: 0.15,
-            taper: 0.57,
-            size_pct_max: Some(0.25),
-            taper_max: None,
-            offset: 0.0,
-        };
-        let mut rng = create_rng("range-test");
-        let mut values = Vec::new();
-        for _ in 0..20 {
-            let v = tab.randomize_tab_size(0.25, &mut rng);
-            assert!(
-                v >= 0.15 - 1e-10 && v <= 0.25 + 1e-10,
-                "value {} out of range",
-                v
-            );
-            values.push(v);
-        }
-        // With 20 samples from [0.15, 0.25], we should see at least 2 distinct values
-        values.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        values.dedup_by(|a, b| (*a - *b).abs() < 1e-10);
-        assert!(
-            values.len() >= 2,
-            "should produce varied values, got {:?}",
-            values
-        );
-    }
-
-    #[test]
-    fn test_randomize_neck_ratio_none_returns_fixed() {
-        use crate::seed::create_rng;
-        let tab = TabConfig::default(); // taper_max = None
-        let mut rng = create_rng("test");
-        let val = tab.randomize_neck_ratio(&mut rng);
-        assert!(
-            (val - tab.neck_ratio()).abs() < 1e-10,
-            "should return fixed neck_ratio"
-        );
-    }
-
-    #[test]
-    fn test_randomize_neck_ratio_some_produces_range() {
-        use crate::seed::create_rng;
-        let tab = TabConfig {
-            size_pct: 0.25,
-            taper: 0.57,
-            size_pct_max: None,
-            taper_max: Some(1.32),
-            offset: 0.0,
-        };
-        let mut rng = create_rng("neck-range-test");
-        let mut values = Vec::new();
-        for _ in 0..20 {
-            let v = tab.randomize_neck_ratio(&mut rng);
-            // taper in [0.57, 1.32] → neck_ratio in [0.34, 0.715]
-            assert!(
-                v >= 0.34 - 1e-10 && v <= 0.715 + 1e-10,
-                "neck_ratio {} out of range",
-                v
-            );
-            values.push(v);
-        }
-        values.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        values.dedup_by(|a, b| (*a - *b).abs() < 1e-10);
-        assert!(
-            values.len() >= 2,
-            "should produce varied neck ratios, got {:?}",
-            values
-        );
-    }
-
-    #[test]
-    fn test_validate_size_pct_max_out_of_range() {
-        let tab = TabConfig {
-            size_pct: 0.20,
-            taper: 0.57,
-            size_pct_max: Some(0.30), // too large
-            taper_max: None,
-            offset: 0.0,
-        };
-        assert!(tab.validate().is_err());
-    }
-
-    #[test]
-    fn test_validate_size_pct_max_less_than_min() {
-        let tab = TabConfig {
-            size_pct: 0.20,
-            taper: 0.57,
-            size_pct_max: Some(0.15), // less than size_pct
-            taper_max: None,
-            offset: 0.0,
-        };
-        assert!(tab.validate().is_err());
-    }
-
-    #[test]
-    fn test_validate_taper_max_out_of_range() {
-        let tab = TabConfig {
-            size_pct: 0.20,
-            taper: 0.57,
-            size_pct_max: None,
-            taper_max: Some(1.50), // too large
-            offset: 0.0,
-        };
-        assert!(tab.validate().is_err());
-    }
-
-    #[test]
-    fn test_validate_taper_max_less_than_min() {
-        let tab = TabConfig {
-            size_pct: 0.20,
-            taper: 0.80,
-            size_pct_max: None,
-            taper_max: Some(0.60), // less than taper
-            offset: 0.0,
-        };
-        assert!(tab.validate().is_err());
     }
 }

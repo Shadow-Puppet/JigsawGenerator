@@ -25,13 +25,15 @@ Thumbs.db
 .env.*
 !.env.example
 
-# Agent / planning / scratch
-.gsd/
-.planning/
+# Agent / scratch
 .claude/
 .bg-shell/
 .artifacts/
 CLAUDE.md
+
+# Legacy planning systems (superseded by .planning/)
+.gsd/
+.planning-legacy/
 
 # Build / cache
 *.code-workspace

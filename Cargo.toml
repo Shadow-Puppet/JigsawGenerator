@@ -8,3 +8,28 @@ members = [
 [profile.release]
 lto = true
 codegen-units = 1
+
+# Release-optimize heavy compute dependencies even in dev/debug builds.
+# Without this, `dev:wasm` runs linesweeper / voronoice / kurbo with
+# bounds-checking on every Vec access and no inlining, which is 10–30×
+# slower than release.
+[profile.dev.package.linesweeper]
+opt-level = 3
+[profile.dev.package.voronoice]
+opt-level = 3
+[profile.dev.package.kurbo]
+opt-level = 3
+[profile.dev.package.rand]
+opt-level = 3
+[profile.dev.package.rand_chacha]
+opt-level = 3
+
+# puzzle-core's hot loops (polygon_contains, voronoi_cell_as_path,
+# polygon_centroid, the Lloyd inner relaxation) are expensive when
+# unoptimized — debug-mode bounds-checking and no inlining make them
+# 5–10× slower than release. Bumping to opt-level=2 keeps build times
+# reasonable (~3s incremental) and gives release-like runtime perf.
+# debug-assertions and overflow-checks stay on by default for the
+# dev profile, so we still catch arithmetic bugs.
+[profile.dev.package.puzzle-core]
+opt-level = 2

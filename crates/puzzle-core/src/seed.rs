@@ -23,6 +23,28 @@ pub fn hash_seed(s: &str) -> u64 {
     hash
 }
 
+/// Hash a seed string + an unordered piece pair to one bit. Used to
+/// pick a deterministic knob direction per *edge identity*, not per
+/// generation order — without this, knob directions flicker during
+/// interactive drags because Voronoi cell ordering shifts as Lloyd
+/// re-relaxes seeds. Hashing on the piece pair makes the choice
+/// invariant to insertion order while still randomized by seed.
+///
+/// Pieces are sorted into (lo, hi) so `(a, b)` and `(b, a)` produce
+/// the same hash — every edge has one canonical direction.
+pub fn hash_pair_bit(seed: u64, a: usize, b: usize) -> bool {
+    let lo = a.min(b) as u64;
+    let hi = a.max(b) as u64;
+    let mut hash = seed;
+    for chunk in [lo, hi] {
+        for byte in chunk.to_le_bytes() {
+            hash ^= byte as u64;
+            hash = hash.wrapping_mul(FNV_PRIME);
+        }
+    }
+    hash & 1 == 0
+}
+
 /// Create a deterministic RNG from a seed string.
 ///
 /// Hashes the string to u64 via FNV-1a, then seeds a ChaCha8Rng.

@@ -13,21 +13,34 @@
           <h1>Puzzle Pattern Generator</h1>
 
           <section class="control-section">
-            <h2 class="section-header">Grid Size <label class="pill-toggle" title="Lock grid size"><svg class="pill-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5 7V5a3 3 0 0 1 6 0" class="lock-shackle"/></svg><input type="checkbox" id="grid-lock" /><span class="pill-track"><span class="pill-knob"></span></span></label></h2>
+            <h2 class="section-header">Pieces</h2>
             <div class="control-row piece-count-row">
               <div class="input-group">
                 <label for="piece-target">Piece Count</label>
-                <input type="number" id="piece-target" min="4" max="10000" value="48" />
-              </div>
-            </div>
-            <div class="control-row">
-              <div class="input-group">
-                <label for="rows">Rows</label>
-                <input type="number" id="rows" min="2" max="100" value="6" />
+                <input type="number" id="piece-target" min="2" max="5000" value="48" />
               </div>
               <div class="input-group">
-                <label for="cols">Columns</label>
-                <input type="number" id="cols" min="2" max="100" value="8" />
+                <label for="cell-algorithm">Algorithm</label>
+                <select id="cell-algorithm">
+                  <option value="cvt">CVT</option>
+                  <option value="poisson">Poisson</option>
+                </select>
+              </div>
+              <div class="input-group" id="poisson-polish-group" hidden>
+                <label for="poisson-polish" title="Lloyd polish iterations applied after Poisson disc seeding. 0 = raw Poisson (visible cell-size variation). 3 = good default. 10 = near full CVT quality.">Polish</label>
+                <select id="poisson-polish">
+                  <option value="0">0</option>
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3" selected>3</option>
+                  <option value="4">4</option>
+                  <option value="5">5</option>
+                  <option value="6">6</option>
+                  <option value="7">7</option>
+                  <option value="8">8</option>
+                  <option value="9">9</option>
+                  <option value="10">10</option>
+                </select>
               </div>
             </div>
             <ul id="piece-size-warning" class="piece-size-warning"></ul>
@@ -59,7 +72,13 @@
             <div class="control-row">
               <div class="input-group" style="flex:1">
                 <select id="border-shape">
-                  <option value="">Rectangle</option>
+                  <option value="rectangle">Rectangle</option>
+                  <option value="rounded-rect">Rounded Rectangle</option>
+                  <option value="circle">Circle</option>
+                  <option value="triangle">Triangle</option>
+                  <option value="diamond">Diamond</option>
+                  <option value="hexagon">Hexagon</option>
+                  <option value="arrow">Arrow</option>
                   <option value="heart">Heart</option>
                   <option value="star">Star</option>
                 </select>
@@ -67,49 +86,22 @@
             </div>
           </section>
 
+
           <section class="control-section">
-            <h2 class="section-header">Parameters</h2>
-            <div class="slider-group" id="tab-group">
-              <div class="slider-label">
-                <span class="label-with-toggle">
-                  <label for="tab">Tab Size</label>
-                  <label class="pill-toggle pill-toggle-sm" title="Randomize per edge">
-                    <svg class="pill-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="12" height="12" rx="2"/><circle cx="5.5" cy="5.5" r="0.75" fill="currentColor" stroke="none"/><circle cx="8" cy="8" r="0.75" fill="currentColor" stroke="none"/><circle cx="10.5" cy="10.5" r="0.75" fill="currentColor" stroke="none"/></svg>
-                    <input type="checkbox" id="tab-randomize" />
-                    <span class="pill-track"><span class="pill-knob"></span></span>
-                  </label>
-                </span>
-                <span class="readout" id="tab-readout">20%</span>
-              </div>
-              <div class="range-slider-container" id="tab-track">
-                <input type="range" id="tab" min="0.15" max="0.20" step="0.01" value="0.20" />
-                <input type="range" id="tab-max" min="0.15" max="0.20" step="0.01" value="0.20" class="range-max" style="display:none" />
-              </div>
+            <h2 class="section-header">Knobs <label class="pill-toggle" title="Toggle connector knobs"><input type="checkbox" id="knobs-enabled" checked /><span class="pill-track"><span class="pill-knob"></span></span></label></h2>
+            <div class="control-row toggle-row">
+              <label class="toggle-row-label" for="edge-knobs-enabled">Knobs on edge pieces</label>
+              <label class="pill-toggle" title="Add knobs along the puzzle silhouette so edge pieces look like inner pieces"><input type="checkbox" id="edge-knobs-enabled" /><span class="pill-track"><span class="pill-knob"></span></span></label>
             </div>
-            <div class="slider-group" id="taper-group">
-              <div class="slider-label">
-                <span class="label-with-toggle">
-                  <label for="taper">Taper</label>
-                  <label class="pill-toggle pill-toggle-sm" title="Randomize per edge">
-                    <svg class="pill-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="12" height="12" rx="2"/><circle cx="5.5" cy="5.5" r="0.75" fill="currentColor" stroke="none"/><circle cx="8" cy="8" r="0.75" fill="currentColor" stroke="none"/><circle cx="10.5" cy="10.5" r="0.75" fill="currentColor" stroke="none"/></svg>
-                    <input type="checkbox" id="taper-randomize" />
-                    <span class="pill-track"><span class="pill-knob"></span></span>
-                  </label>
-                </span>
-                <span class="readout" id="taper-readout">0.00</span>
-              </div>
-              <div class="range-slider-container" id="taper-track">
-                <input type="range" id="taper" min="0" max="1" step="0.01" value="0" />
-                <input type="range" id="taper-max" min="0" max="1" step="0.01" value="0" class="range-max" style="display:none" />
-              </div>
-            </div>
-            <div class="slider-group" id="offset-group">
-              <div class="slider-label">
-                <label for="offset">Tab Offset</label>
-                <span class="readout" id="offset-readout">0.00</span>
-              </div>
-              <input type="range" id="offset" min="0" max="0.10" step="0.01" value="0" />
-            </div>
+          </section>
+
+          <section class="control-section">
+            <h2 class="section-header">Seeds <label class="pill-toggle" title="Show seed positions (red = current, hollow = initial anchors)"><input type="checkbox" id="seeds-visible" /><span class="pill-track"><span class="pill-knob"></span></span></label></h2>
+          </section>
+
+          <section class="control-section">
+            <h2 class="section-header">Whimsies <button type="button" id="add-whimsy" class="section-add-btn" title="Add a whimsy">+</button></h2>
+            <ul id="whimsy-list" class="whimsy-list"></ul>
           </section>
 
           <section class="control-section">
@@ -127,13 +119,13 @@
         </aside>
 
         <main class="preview-area">
-          <div id="dimension-ruler">
-            <span id="ruler-width" class="ruler-label"></span>
-            <span class="ruler-x">&times;</span>
-            <span id="ruler-height" class="ruler-label"></span>
-          </div>
-          <div id="svg-viewport">
-            <canvas id="puzzle-canvas"></canvas>
+          <div class="ruler-grid">
+            <div class="ruler-corner"></div>
+            <canvas id="ruler-h" class="ruler-h"></canvas>
+            <canvas id="ruler-v" class="ruler-v"></canvas>
+            <div id="svg-viewport">
+              <canvas id="puzzle-canvas"></canvas>
+            </div>
           </div>
           <div class="preview-footer">
             <p id="piece-count"></p>
@@ -148,6 +140,23 @@
         </main>
       </div>
     </div>
+    <dialog id="shape-picker" class="shape-picker">
+      <form method="dialog" class="shape-picker-form">
+        <div class="shape-picker-header">
+          <h3>Choose a whimsy shape</h3>
+          <button type="submit" value="cancel" class="close-btn" aria-label="Close">&times;</button>
+        </div>
+        <div class="shape-picker-grid">
+          <button type="submit" value="circle" class="shape-option" data-shape="circle"><span class="shape-label">Circle</span></button>
+          <button type="submit" value="heart" class="shape-option" data-shape="heart"><span class="shape-label">Heart</span></button>
+          <button type="submit" value="star" class="shape-option" data-shape="star"><span class="shape-label">Star</span></button>
+          <button type="submit" value="triangle" class="shape-option" data-shape="triangle"><span class="shape-label">Triangle</span></button>
+          <button type="submit" value="diamond" class="shape-option" data-shape="diamond"><span class="shape-label">Diamond</span></button>
+          <button type="submit" value="hexagon" class="shape-option" data-shape="hexagon"><span class="shape-label">Hexagon</span></button>
+          <button type="submit" value="arrow" class="shape-option" data-shape="arrow"><span class="shape-label">Arrow</span></button>
+        </div>
+      </form>
+    </dialog>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

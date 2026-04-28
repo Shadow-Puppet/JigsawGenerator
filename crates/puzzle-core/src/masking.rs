@@ -110,7 +110,7 @@ mod tests {
     fn test_difference_rect_minus_star() {
         let rect = rect_path(0.0, 0.0, 200.0, 200.0);
         // Star centered inside the rectangle (offset by 60,60)
-        let star = star_path(80.0, 80.0, 5);
+        let star = star_path(80.0, 80.0, 5, 0.0);
         let mut shifted_star = BezPath::new();
         for el in star.iter() {
             match el {

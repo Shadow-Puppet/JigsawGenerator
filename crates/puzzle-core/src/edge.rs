@@ -28,6 +28,12 @@ pub struct Edge {
     pub direction: TabDirection,
     /// Bezier curves for the connector shape. None until connector generation.
     pub connector: Option<Vec<CubicBez>>,
+    /// Params used to generate `connector`. Stored so the connector can be
+    /// regenerated at a different length when the edge is shortened by a
+    /// custom border clipping — e.g., boundary-aware puzzles re-fit the
+    /// knob onto the inside-boundary portion of the cell edge.
+    #[serde(default)]
+    pub connector_params: Option<EdgeParams>,
 }
 
 impl Edge {
@@ -40,22 +46,28 @@ impl Edge {
 
 /// Parameters passed to a [`ConnectorGenerator`](super::ConnectorGenerator)
 /// for generating connector shapes on internal edges.
+///
+/// Knob size and neck taper are both derived from constants in the
+/// connector implementation (see `classic_connector.rs`:
+/// `KNOB_WIDTH_RATIO`, `NECK_RATIO`). Only the geometric inputs
+/// (length, cross length, direction) are user-visible.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EdgeParams {
     /// Edge length in mm.
     pub length: f64,
-    /// Perpendicular cell dimension in mm (cell_h for h-edges, cell_w for v-edges).
-    /// Used with `length` to compute uniform knob sizing via `min(length, cross_length)`.
+    /// Perpendicular span in mm: distance between adjacent piece
+    /// centers. Used with `length` to bound knob protrusion via
+    /// `min(length, cross_length)` so knobs don't overshoot into a
+    /// neighbor's interior.
     pub cross_length: f64,
     /// Tab direction (In or Out).
     pub direction: TabDirection,
-    /// Tab size as a fraction of edge length (0.15..=0.45, dynamically clamped).
-    pub tab_size: f64,
-    /// Neck-to-body width ratio derived from taper (0.5..=1.0).
-    /// 1.0 = no taper, 0.5 = maximum taper.
-    pub neck_ratio: f64,
-    /// Offset of the knob center from the edge midpoint, as a fraction of edge length.
-    /// 0.0 = centered, positive = shift right, negative = shift left.
+    /// Signed offset (mm) along the edge from the centered position.
+    /// Positive shifts toward `end`, negative toward `start`. Used by
+    /// the collision-resolution slide pass to push two colliding
+    /// knobs along their respective edges. Defaults to `0.0` (knob
+    /// centered on the edge).
+    #[serde(default)]
     pub offset: f64,
 }
 
@@ -71,6 +83,7 @@ mod tests {
             is_border: false,
             direction: TabDirection::Out,
             connector: None,
+            connector_params: None,
         };
         assert!((edge.length() - 100.0).abs() < 1e-10);
     }
@@ -83,6 +96,7 @@ mod tests {
             is_border: true,
             direction: TabDirection::In,
             connector: None,
+            connector_params: None,
         };
         assert!((edge.length() - 50.0).abs() < 1e-10);
     }
@@ -95,6 +109,7 @@ mod tests {
             is_border: false,
             direction: TabDirection::In,
             connector: None,
+            connector_params: None,
         };
         assert!((edge.length() - 5.0).abs() < 1e-10);
     }
@@ -107,6 +122,7 @@ mod tests {
             is_border: false,
             direction: TabDirection::In,
             connector: None,
+            connector_params: None,
         };
         assert!((edge.length()).abs() < 1e-10);
     }
@@ -136,6 +152,7 @@ mod tests {
             is_border: false,
             direction: TabDirection::Out,
             connector: None,
+            connector_params: None,
         };
         let json = serde_json::to_string(&edge).unwrap();
         let deserialized: Edge = serde_json::from_str(&json).unwrap();
